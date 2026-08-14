@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, UserPlus, Trash2, Edit2, Check, Sparkles, AlertCircle } from 'lucide-react';
+import { X, UserPlus, Trash2, Edit2, Check, Sparkles } from 'lucide-react';
 import { Participant } from '../types';
 import { triggerHaptic, playPopSound } from '../utils/soundEffects';
 
@@ -13,8 +13,7 @@ interface ParticipantsModalProps {
   soundMuted?: boolean;
 }
 
-const AVAILABLE_AVATARS = ['👑', '⚡', '🛡️', '🧘', '🚀', '🔥', '🥷', '🦁', '🦖', '🤠', '🎩', '👾', '🎯', '🥑', '🌮', '☕'];
-const AVAILABLE_COLORS = ['amber', 'emerald', 'blue', 'purple', 'rose', 'indigo', 'teal', 'orange'];
+const AVAILABLE_AVATARS = ['👑', '⚡', '🦁', '🦖', '🤠', '🥷', '🚀', '🔥', '🧘', '🍕', '💩', '🥑', '🌮', '☕', '👾', '🎯'];
 
 export const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
   isOpen,
@@ -29,18 +28,15 @@ export const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
   const [avatar, setAvatar] = useState('👑');
-  const [color, setColor] = useState('amber');
 
   if (!isOpen) return null;
 
   const handleStartEdit = (p: Participant) => {
     triggerHaptic(15);
-    playPopSound(soundMuted);
     setEditingId(p.id);
     setName(p.name);
     setNickname(p.nickname || '');
     setAvatar(p.avatar);
-    setColor(p.color);
   };
 
   const handleCancelEdit = () => {
@@ -49,7 +45,6 @@ export const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
     setName('');
     setNickname('');
     setAvatar('👑');
-    setColor('amber');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -67,7 +62,6 @@ export const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
           name: name.trim(),
           nickname: nickname.trim() || undefined,
           avatar,
-          color,
         });
       }
       handleCancelEdit();
@@ -76,96 +70,48 @@ export const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
         name: name.trim(),
         nickname: nickname.trim() || undefined,
         avatar,
-        color,
+        color: 'amber',
       });
       setName('');
       setNickname('');
-      // Cycle avatar
       const nextIdx = (AVAILABLE_AVATARS.indexOf(avatar) + 1) % AVAILABLE_AVATARS.length;
       setAvatar(AVAILABLE_AVATARS[nextIdx]);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-950/75 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] border-t-3 border-x-3 sm:border-3 border-stone-900 overflow-hidden my-0 sm:my-6 max-h-[92vh] flex flex-col">
-        {/* Mobile Pull Handle */}
-        <div className="w-12 h-1.5 bg-stone-300 rounded-full mx-auto mt-2.5 sm:hidden" />
-
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-950/60 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-xl border border-stone-200 overflow-hidden my-0 sm:my-6 max-h-[90vh] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
         {/* Header */}
-        <div className="bg-stone-950 p-4 sm:p-5 text-white flex items-center justify-between border-b-3 border-stone-900 shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl sm:text-3xl">👥</span>
-            <div>
-              <h2 className="font-['Outfit',sans-serif] text-lg sm:text-xl font-black text-[#FFD93D]">
-                Participantes do Campeonato
-              </h2>
-              <p className="text-stone-300 text-xs font-bold">
-                Adicione e gerencie os competidores da liga
-              </p>
-            </div>
+        <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">👥</span>
+            <h2 className="font-['Outfit',sans-serif] text-base sm:text-lg font-black text-stone-900">
+              Amigos no Torneio
+            </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-white border-2 border-stone-700 transition-colors cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5"
+            className="p-1.5 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-200 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5 stroke-[2.5]" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Content */}
-        <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
+        {/* Body */}
+        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
           {/* Add / Edit Form */}
-          <form
-            onSubmit={handleSubmit}
-            className="p-4 rounded-2xl bg-[#FFF9E6] border-2 border-stone-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] space-y-3.5"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black uppercase tracking-wider text-stone-950 flex items-center gap-1.5">
-                <UserPlus className="w-4 h-4 text-stone-950 stroke-[2.5]" />
-                {editingId ? 'Editar Participante' : 'Adicionar Novo Amigo'}
-              </span>
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className="text-xs text-stone-700 hover:text-stone-950 font-black underline cursor-pointer"
-                >
-                  Cancelar Edição
-                </button>
-              )}
-            </div>
+          <form onSubmit={handleSubmit} className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-3">
+            <span className="text-xs font-black text-stone-700 uppercase tracking-wider block">
+              {editingId ? 'Editar Amigo' : '+ Novo Amigo'}
+            </span>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-black text-stone-900 mb-1">Nome *</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Leo, Bruno, Gui..."
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border-2 border-stone-900 bg-white focus:ring-2 focus:ring-[#FFD93D] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-black text-stone-900 mb-1">Apelido (Opcional)</label>
-                <input
-                  type="text"
-                  placeholder="Ex: O Estrategista"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border-2 border-stone-900 bg-white focus:ring-2 focus:ring-[#FFD93D] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                />
-              </div>
-            </div>
-
-            {/* Avatar picker */}
+            {/* Avatar Selector */}
             <div>
-              <label className="block text-xs font-black text-stone-900 mb-1.5">
-                Escolha o Emoji do Competidor
+              <label className="block text-[11px] font-bold text-stone-500 mb-1">
+                Escolha o Emoji / Avatar
               </label>
-              <div className="grid grid-cols-8 sm:flex sm:flex-wrap gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
                 {AVAILABLE_AVATARS.map((emoji) => (
                   <button
                     key={emoji}
@@ -174,10 +120,10 @@ export const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
                       triggerHaptic(10);
                       setAvatar(emoji);
                     }}
-                    className={`h-10 rounded-xl text-lg flex items-center justify-center border-2 transition-all cursor-pointer ${
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 transition-all cursor-pointer ${
                       avatar === emoji
-                        ? 'bg-[#FFD93D] border-stone-900 scale-110 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                        : 'bg-white border-stone-900 hover:bg-stone-100 shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]'
+                        ? 'bg-amber-400 text-stone-950 scale-110 border border-amber-500 shadow-xs'
+                        : 'bg-white border border-stone-200 hover:bg-stone-100'
                     }`}
                   >
                     {emoji}
@@ -186,80 +132,82 @@ export const ParticipantsModal: React.FC<ParticipantsModalProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-end pt-1">
+            {/* Name input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Nome do amigo (ex: Leo)"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={25}
+                required
+                className="flex-1 px-3 py-2 text-xs font-bold rounded-xl border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
               <button
                 type="submit"
-                className="w-full sm:w-auto px-5 py-3 rounded-xl text-xs font-black bg-[#FF6B6B] hover:bg-[#ff5252] text-white border-2 border-stone-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px]"
+                className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 font-black text-xs text-stone-950 transition-all cursor-pointer shadow-xs"
               >
-                {editingId ? <Check className="w-4 h-4 stroke-[2.5]" /> : <UserPlus className="w-4 h-4 stroke-[2.5]" />}
-                <span>{editingId ? 'Salvar Alterações' : 'Cadastrar Amigo'}</span>
+                {editingId ? 'Salvar' : 'Adicionar'}
               </button>
             </div>
+            {editingId && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="text-[11px] font-bold text-stone-500 hover:underline cursor-pointer"
+              >
+                Cancelar edição
+              </button>
+            )}
           </form>
 
-          {/* Current list */}
-          <div className="space-y-3">
-            <h3 className="font-['Outfit',sans-serif] font-black text-sm text-stone-950">
-              Amigos Inscritos ({participants.length})
-            </h3>
+          {/* List of existing participants */}
+          <div>
+            <span className="text-xs font-black text-stone-700 uppercase tracking-wider block mb-2">
+              Participantes Cadastrados ({participants.length})
+            </span>
 
-            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-              {participants.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between p-3 rounded-2xl border-2 border-stone-900 bg-white hover:bg-stone-50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-stone-100 border-2 border-stone-900 flex items-center justify-center text-xl shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
-                      {p.avatar}
+            {participants.length === 0 ? (
+              <p className="text-xs text-stone-500 font-medium py-3 text-center">
+                Nenhum amigo cadastrado ainda. Use o campo acima para adicionar!
+              </p>
+            ) : (
+              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                {participants.map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between gap-2 shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-xl shrink-0">{p.avatar}</span>
+                      <span className="font-bold text-xs text-stone-900 truncate">{p.name}</span>
                     </div>
-                    <div>
-                      <p className="font-black text-xs sm:text-sm text-stone-950">{p.name}</p>
-                      {p.nickname && (
-                        <p className="text-[11px] text-stone-600 font-bold italic">"{p.nickname}"</p>
-                      )}
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleStartEdit(p)}
+                        className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Remover ${p.name} do torneio?`)) {
+                            onDeleteParticipant(p.id);
+                          }
+                        }}
+                        className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Remover"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleStartEdit(p)}
-                      className="p-2 rounded-xl text-stone-700 hover:text-stone-950 hover:bg-stone-100 border-2 border-stone-900 transition-colors shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
-                      title="Editar"
-                    >
-                      <Edit2 className="w-4 h-4 stroke-[2.5]" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        triggerHaptic(20);
-                        if (participants.length <= 1) {
-                          alert('O campeonato precisa de pelo menos 1 participante!');
-                          return;
-                        }
-                        if (window.confirm(`Remover "${p.name}" do campeonato?`)) {
-                          onDeleteParticipant(p.id);
-                        }
-                      }}
-                      className="p-2 rounded-xl text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border-2 border-rose-400 transition-colors cursor-pointer"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-4 h-4 stroke-[2.5]" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 bg-stone-50 border-t-2 border-stone-900 flex justify-end pb-safe">
-          <button
-            onClick={onClose}
-            className="w-full sm:w-auto px-6 py-3 rounded-xl text-xs font-black bg-stone-950 hover:bg-stone-800 text-white border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer min-h-[44px]"
-          >
-            Concluir
-          </button>
         </div>
       </div>
     </div>

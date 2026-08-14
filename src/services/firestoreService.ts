@@ -266,6 +266,22 @@ export async function resetFirestoreToSample() {
 }
 
 /**
+ * Clear ALL participants and entries in Firestore (zero the database completely)
+ */
+export async function clearAllFirestoreData() {
+  try {
+    const partSnap = await getDocs(collection(db, PARTICIPANTS_COLLECTION));
+    const entriesSnap = await getDocs(collection(db, ENTRIES_COLLECTION));
+    const batch = writeBatch(db);
+    partSnap.forEach((d) => batch.delete(d.ref));
+    entriesSnap.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, 'clear_all');
+  }
+}
+
+/**
  * Clear all entries in Firestore
  */
 export async function clearAllEntriesFromFirestore() {

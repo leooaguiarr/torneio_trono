@@ -1,126 +1,88 @@
 import React from 'react';
-import { Trophy, Plus, Users, Share2, Volume2, VolumeX, Cloud, LogIn, LogOut } from 'lucide-react';
-import { Participant } from '../types';
+import { Users, Share2, Volume2, VolumeX, Trash2 } from 'lucide-react';
 import { User } from 'firebase/auth';
 
 interface HeaderProps {
-  participants: Participant[];
-  onOpenNewEntry: () => void;
   onOpenParticipants: () => void;
   onOpenShare: () => void;
   soundMuted: boolean;
   onToggleSound: () => void;
   totalEntriesCount: number;
-  isCloudSyncing?: boolean;
-  currentUser?: User | null;
-  onLoginGoogle?: () => void;
-  onLogout?: () => void;
+  onClearAll: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  onOpenNewEntry,
   onOpenParticipants,
   onOpenShare,
   soundMuted,
   onToggleSound,
   totalEntriesCount,
-  isCloudSyncing = true,
-  currentUser,
-  onLoginGoogle,
-  onLogout,
+  onClearAll,
 }) => {
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b-2 border-stone-900 shadow-xs">
-      <div className="max-w-4xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2">
-        {/* Logo and Title */}
+    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-xs">
+      <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        {/* Brand */}
         <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#FFD93D] border-2 border-stone-900 flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-2xl select-none shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-amber-400 border border-stone-900/15 flex items-center justify-center text-xl shadow-xs shrink-0">
             🚽
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-['Outfit',sans-serif] text-base sm:text-xl font-black text-stone-950 tracking-tight">
-                Torneio do Trono
-              </h1>
-            </div>
-            <div className="text-[10px] sm:text-xs text-stone-600 font-bold flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 text-emerald-700 font-black">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Nuvem Ativa
-              </span>
+            <h1 className="font-['Outfit',sans-serif] text-base sm:text-lg font-black text-stone-900 leading-tight">
+              Torneio do Trono
+            </h1>
+            <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-semibold">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Nuvem Ativa</span>
               <span>•</span>
-              <span>{totalEntriesCount} idas</span>
+              <span>{totalEntriesCount} {totalEntriesCount === 1 ? 'ida' : 'idas'}</span>
             </div>
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Top Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Sound Toggle */}
           <button
-            id="btn-toggle-sound"
+            id="btn-sound"
             onClick={onToggleSound}
             title={soundMuted ? 'Ativar som' : 'Silenciar som'}
-            className={`p-2 rounded-xl text-xs font-black border-2 border-stone-900 transition-all flex items-center justify-center cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 ${
-              soundMuted
-                ? 'bg-stone-100 text-stone-600'
-                : 'bg-[#FFD93D] text-stone-950'
-            }`}
+            className="p-2 rounded-xl text-stone-600 hover:text-stone-950 hover:bg-stone-100 border border-stone-200 transition-colors cursor-pointer"
           >
             {soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
 
-          {/* Manage Participants */}
+          {/* Manage Friends */}
           <button
-            id="btn-manage-participants"
+            id="btn-friends"
             onClick={onOpenParticipants}
-            title="Gerenciar Amigos"
-            className="px-2.5 py-2 sm:px-3 rounded-xl text-xs font-black bg-[#4D96FF] hover:bg-[#68a5ff] text-white border-2 border-stone-900 transition-all flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer min-h-[38px]"
+            title="Adicionar ou gerenciar amigos"
+            className="px-3 py-2 rounded-xl text-xs font-bold text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <Users className="w-4 h-4 stroke-[2.5]" />
+            <Users className="w-4 h-4 text-stone-700" />
             <span className="hidden sm:inline">Amigos</span>
           </button>
 
           {/* Share WhatsApp */}
           <button
-            id="btn-share-ranking"
+            id="btn-share"
             onClick={onOpenShare}
             title="Compartilhar no WhatsApp"
-            className="px-2.5 py-2 sm:px-3 rounded-xl text-xs font-black bg-[#25D366] hover:bg-[#20b858] text-white border-2 border-stone-900 transition-all flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer min-h-[38px]"
+            className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Share2 className="w-4 h-4 stroke-[2.5]" />
+            <Share2 className="w-4 h-4" />
             <span className="hidden sm:inline">WhatsApp</span>
           </button>
 
-          {/* Auth Button */}
-          {currentUser ? (
-            <button
-              onClick={onLogout}
-              title={`Conectado como ${currentUser.displayName || 'Usuário'}. Clique para sair.`}
-              className="p-1.5 rounded-xl border-2 border-stone-900 bg-stone-100 hover:bg-stone-200 text-xs font-bold flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
-            >
-              {currentUser.photoURL ? (
-                <img
-                  src={currentUser.photoURL}
-                  alt="Avatar"
-                  className="w-5 h-5 rounded-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span>👤</span>
-              )}
-            </button>
-          ) : (
-            onLoginGoogle && (
-              <button
-                onClick={onLoginGoogle}
-                title="Entrar com Google"
-                className="px-2.5 py-2 rounded-xl text-xs font-black bg-white hover:bg-stone-100 text-stone-900 border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
-              >
-                <LogIn className="w-4 h-4 text-stone-800" />
-              </button>
-            )
-          )}
+          {/* Clear Button */}
+          <button
+            id="btn-clear"
+            onClick={onClearAll}
+            title="Zerar banco de dados"
+            className="p-2 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 border border-stone-200 transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </header>

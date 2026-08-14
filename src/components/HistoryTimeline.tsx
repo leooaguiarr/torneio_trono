@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Trash2, Edit3, Plus, Sparkles } from 'lucide-react';
+import { Clock, Trash2, Edit3, Plus } from 'lucide-react';
 import { EFFORT_LEVELS, Participant, PoopEntry } from '../types';
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { triggerHaptic } from '../utils/soundEffects';
@@ -26,21 +26,21 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Header */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-stone-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between">
+      <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-xs flex items-center justify-between">
         <div>
-          <h3 className="font-['Outfit',sans-serif] font-black text-lg sm:text-xl text-stone-950 flex items-center gap-2">
-            <span>📜</span> Últimas Idas ao Banheiro
+          <h3 className="font-['Outfit',sans-serif] font-black text-base text-stone-900 flex items-center gap-2">
+            <span>📜</span> Histórico de Idas
           </h3>
-          <p className="text-xs text-stone-600 font-bold">
-            Total de {entries.length} {entries.length === 1 ? 'registro' : 'registros'} no histórico
+          <p className="text-xs text-stone-500 font-medium">
+            {entries.length} {entries.length === 1 ? 'registro gravado' : 'registros gravados'}
           </p>
         </div>
 
         <button
           onClick={onOpenNewEntry}
-          className="px-3 py-2 rounded-xl text-xs font-black bg-[#FF6B6B] hover:bg-[#ff5252] text-white border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center gap-1 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500 hover:bg-rose-600 text-white shadow-xs transition-all flex items-center gap-1 cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 stroke-[3]" />
           <span>Nova Ida</span>
@@ -49,15 +49,15 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({
 
       {/* Entries List */}
       {sortedEntries.length === 0 ? (
-        <div className="bg-white p-8 rounded-3xl border-2 border-stone-900 text-center space-y-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-          <span className="text-4xl">🚽</span>
-          <h4 className="font-black text-stone-900 text-base">Nenhuma ida registrada ainda</h4>
-          <p className="text-xs text-stone-600 font-bold">
-            Clique no botão "+1 Ida" de qualquer amigo no placar para começar!
+        <div className="bg-white p-8 rounded-2xl border border-stone-200 text-center space-y-2 shadow-xs">
+          <span className="text-3xl">🚽</span>
+          <h4 className="font-bold text-stone-900 text-sm">Nenhuma ida registrada</h4>
+          <p className="text-xs text-stone-500 font-medium">
+            Clique em "Nova Ida" ou use o botão "+1 Ida" no placar!
           </p>
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {sortedEntries.map((entry) => {
             const p = getParticipant(entry.participantId);
             const { relative, exactTime } = formatFriendlyDate(entry.timestamp);
@@ -66,30 +66,28 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({
             return (
               <div
                 key={entry.id}
-                className="bg-white p-3 sm:p-3.5 rounded-2xl border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-between gap-3 hover:bg-stone-50 transition-colors"
+                className="bg-white p-3 rounded-2xl border border-stone-200 shadow-xs flex items-center justify-between gap-3 hover:border-stone-300 transition-colors"
               >
                 {/* Left: Avatar + Details */}
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-[#FFF9E6] border-2 border-stone-900 flex items-center justify-center text-xl shrink-0 shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-lg shrink-0">
                     {p?.avatar || '🚽'}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-black text-xs sm:text-sm text-stone-950">
+                      <span className="font-bold text-xs sm:text-sm text-stone-900">
                         {p?.name || 'Amigo'}
                       </span>
-                      <span className="text-[10px] font-black bg-stone-100 px-2 py-0.5 rounded-md border border-stone-900/30 text-stone-700">
+                      <span className="text-[10px] font-bold bg-stone-100 px-1.5 py-0.5 rounded text-stone-600">
                         {effortInfo.label}
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-stone-600 font-bold flex items-center gap-2 mt-0.5">
-                      <span>{relative} ({exactTime})</span>
-                      {entry.location && (
-                        <span>• 📍 {entry.location}</span>
-                      )}
+                    <div className="text-[11px] text-stone-500 font-medium flex items-center gap-1.5 mt-0.5">
+                      <span>{relative} às {exactTime}</span>
+                      {entry.location && <span>• 📍 {entry.location}</span>}
                       {entry.notes && (
-                        <span className="italic text-stone-500 truncate max-w-[140px] sm:max-w-xs">
+                        <span className="italic text-stone-400 truncate max-w-[130px] sm:max-w-xs">
                           • "{entry.notes}"
                         </span>
                       )}
@@ -97,14 +95,14 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({
                   </div>
                 </div>
 
-                {/* Right: Actions */}
-                <div className="flex items-center gap-1.5 shrink-0">
+                {/* Right: Action Buttons */}
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => onEditEntry(entry)}
-                    className="p-2 text-stone-600 hover:text-stone-950 rounded-lg hover:bg-stone-100 transition-colors cursor-pointer"
-                    title="Editar registro"
+                    className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+                    title="Editar"
                   >
-                    <Edit3 className="w-4 h-4" />
+                    <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => {
@@ -113,10 +111,10 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({
                         onDeleteEntry(entry.id);
                       }
                     }}
-                    className="p-2 text-rose-500 hover:text-rose-700 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                     title="Excluir"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, MapPin, FileText, CheckCircle, Sparkles, Plus } from 'lucide-react';
+import { X, Check, UserPlus, Clock, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { EFFORT_LEVELS, EffortLevel, LOCATIONS, LocationType, Participant, PoopEntry } from '../types';
 import { formatToDateTimeLocal } from '../utils/dateUtils';
-import { playFlushSound, playSuccessSound, playPopSound, triggerHaptic } from '../utils/soundEffects';
+import { playSuccessSound, triggerHaptic } from '../utils/soundEffects';
 
 interface QuickLogModalProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ interface QuickLogModalProps {
   initialParticipantId?: string;
   editingEntry?: PoopEntry | null;
   soundMuted: boolean;
+  onOpenAddParticipant: () => void;
 }
 
 export const QuickLogModal: React.FC<QuickLogModalProps> = ({
@@ -23,6 +24,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   initialParticipantId,
   editingEntry,
   soundMuted,
+  onOpenAddParticipant,
 }) => {
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>(
     initialParticipantId || participants[0]?.id || ''
@@ -50,15 +52,12 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSetNow = () => {
-    triggerHaptic(15);
-    playPopSound(soundMuted);
-    setTimestamp(formatToDateTimeLocal(new Date()));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedParticipantId) return;
+    if (!selectedParticipantId) {
+      alert('Selecione ou adicione quem foi ao banheiro!');
+      return;
+    }
 
     triggerHaptic(30);
 
@@ -82,9 +81,9 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
 
     try {
       confetti({
-        particleCount: 40,
+        particleCount: 30,
         spread: 60,
-        origin: { y: 0.8 },
+        origin: { y: 0.7 },
       });
     } catch {
       // ignore
@@ -94,160 +93,167 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-950/75 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
-      <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] border-t-3 border-x-3 sm:border-3 border-stone-900 overflow-hidden my-0 sm:my-6 max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-950/60 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-xl border border-stone-200 overflow-hidden my-0 sm:my-6 max-h-[92vh] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
         {/* Header */}
-        <div className="bg-[#FFD93D] p-4 text-stone-950 flex items-center justify-between border-b-3 border-stone-900 shrink-0">
-          <div className="flex items-center gap-2.5">
+        <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+          <div className="flex items-center gap-2">
             <span className="text-2xl">🚽</span>
-            <div>
-              <h2 className="font-['Outfit',sans-serif] text-lg font-black text-stone-950">
-                {editingEntry ? 'Editar Ida ao Trono' : 'Registrar Ida ao Trono'}
-              </h2>
-              <p className="text-stone-800 text-xs font-bold">
-                {editingEntry ? 'Modifique os detalhes da visita' : 'Quem foi ao banheiro e como foi?'}
-              </p>
-            </div>
+            <h2 className="font-['Outfit',sans-serif] text-base sm:text-lg font-black text-stone-900">
+              {editingEntry ? 'Editar Ida ao Trono' : 'Registrar Ida ao Trono'}
+            </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-900 border-2 border-stone-900 transition-colors cursor-pointer shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5"
+            className="p-1.5 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-200 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5 stroke-[2.5]" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form Content */}
+        {/* Form */}
         <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
-          {/* Select Friend */}
+          {/* Step 1: Who went? */}
           <div>
-            <label className="block text-xs font-black text-stone-950 uppercase tracking-wider mb-1.5">
-              1. Quem pontuou? *
+            <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-2">
+              Quem foi ao banheiro?
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {participants.map((p) => {
-                const isSelected = selectedParticipantId === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic(10);
-                      setSelectedParticipantId(p.id);
-                    }}
-                    className={`p-2.5 rounded-xl border-2 font-black text-xs flex items-center gap-2 transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-[#FFD93D] border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] scale-[1.02]'
-                        : 'bg-white border-stone-300 hover:border-stone-900 text-stone-800'
-                    }`}
-                  >
-                    <span className="text-lg">{p.avatar}</span>
-                    <span className="truncate">{p.name}</span>
-                  </button>
-                );
-              })}
-            </div>
+
+            {participants.length === 0 ? (
+              <div className="p-4 rounded-xl border border-dashed border-stone-300 bg-stone-50 text-center space-y-2">
+                <p className="text-xs text-stone-600 font-medium">Nenhum participante ainda!</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAddParticipant();
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-amber-400 font-black text-xs text-stone-950 inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Cadastrar Primeiro Nome</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {participants.map((p) => {
+                  const isSelected = selectedParticipantId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(10);
+                        setSelectedParticipantId(p.id);
+                      }}
+                      className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-amber-100 border-amber-500 ring-2 ring-amber-400/40 text-stone-950 font-black'
+                          : 'bg-stone-50 border-stone-200 hover:border-stone-300 text-stone-700 font-bold'
+                      }`}
+                    >
+                      <span className="text-xl">{p.avatar}</span>
+                      <span className="text-xs truncate flex-1">{p.name}</span>
+                      {isSelected && <Check className="w-4 h-4 text-amber-800" />}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAddParticipant();
+                  }}
+                  className="p-2.5 rounded-xl border border-dashed border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>+ Outro amigo</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Effort Level */}
+          {/* Step 2: Effort (Optional quick emojis) */}
           <div>
-            <label className="block text-xs font-black text-stone-950 uppercase tracking-wider mb-1.5">
-              2. Nível de Esforço (1 a 5)
+            <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-2">
+              Nível de Esforço
             </label>
             <div className="grid grid-cols-5 gap-1.5">
-              {([1, 2, 3, 4, 5] as EffortLevel[]).map((level) => {
-                const isSelected = effortLevel === level;
-                const info = EFFORT_LEVELS[level];
+              {([1, 2, 3, 4, 5] as EffortLevel[]).map((lvl) => {
+                const isSelected = effortLevel === lvl;
+                const info = EFFORT_LEVELS[lvl];
                 return (
                   <button
-                    key={level}
+                    key={lvl}
                     type="button"
                     onClick={() => {
                       triggerHaptic(10);
-                      setEffortLevel(level);
+                      setEffortLevel(lvl);
                     }}
-                    className={`py-2 px-1 rounded-xl border-2 font-black text-xs flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                    className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-[#FF6B6B] text-white border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] scale-105'
-                        : 'bg-stone-50 border-stone-300 hover:border-stone-900 text-stone-800'
+                        ? 'bg-stone-900 text-white border-stone-900 shadow-xs'
+                        : 'bg-stone-50 border-stone-200 hover:border-stone-300 text-stone-700'
                     }`}
                   >
-                    <span className="text-base">{info.emoji}</span>
-                    <span className="text-[10px] font-black">{level}</span>
+                    <span className="text-base block">{info.emoji}</span>
+                    <span className="text-[10px] font-bold block">{info.label}</span>
                   </button>
                 );
               })}
             </div>
-            <p className="text-[11px] text-stone-600 font-bold text-center mt-1">
-              {EFFORT_LEVELS[effortLevel].label} — {EFFORT_LEVELS[effortLevel].description}
-            </p>
           </div>
 
-          {/* Date & Time */}
+          {/* Step 3: Location */}
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-black text-stone-950 uppercase tracking-wider">
-                3. Horário
-              </label>
-              <button
-                type="button"
-                onClick={handleSetNow}
-                className="text-[11px] font-black text-[#4D96FF] hover:underline cursor-pointer"
-              >
-                Agora mesmo ⚡
-              </button>
+            <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-1">
+              Local
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.values(LOCATIONS).map((loc) => {
+                const isSelected = location === loc.type;
+                return (
+                  <button
+                    key={loc.type}
+                    type="button"
+                    onClick={() => setLocation(loc.type)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-100 border-amber-400 text-amber-950'
+                        : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
+                    }`}
+                  >
+                    {loc.emoji} {loc.label}
+                  </button>
+                );
+              })}
             </div>
+          </div>
+
+          {/* Step 4: Optional Note */}
+          <div>
+            <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-1">
+              Comentário rápido (Opcional)
+            </label>
             <input
-              type="datetime-local"
-              value={timestamp}
-              onChange={(e) => setTimestamp(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-bold rounded-xl border-2 border-stone-900 bg-white focus:ring-2 focus:ring-[#FFD93D] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-              required
+              type="text"
+              placeholder="Ex: Café bateu na hora"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              maxLength={60}
+              className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
           </div>
 
-          {/* Location & Notes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-xs font-black text-stone-950 uppercase tracking-wider mb-1">
-                Local
-              </label>
-              <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value as LocationType)}
-                className="w-full px-3 py-2 text-xs font-black rounded-xl border-2 border-stone-900 bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
-              >
-                {Object.values(LOCATIONS).map((loc) => (
-                  <option key={loc.type} value={loc.type}>
-                    {loc.emoji} {loc.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-black text-stone-950 uppercase tracking-wider mb-1">
-                Nota Rápida (Opcional)
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Café bateu forte"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                maxLength={60}
-                className="w-full px-3 py-2 text-xs font-bold rounded-xl border-2 border-stone-900 bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-              />
-            </div>
-          </div>
-
-          {/* Submit Button */}
+          {/* Submit */}
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3.5 rounded-xl font-black text-sm bg-[#FF6B6B] hover:bg-[#ff5252] text-white border-2 border-stone-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
+              className="w-full py-3.5 rounded-xl font-black text-sm bg-rose-500 hover:bg-rose-600 text-white shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Sparkles className="w-4 h-4 text-amber-200" />
-              <span>{editingEntry ? 'Salvar Alterações' : 'Confirmar Ida ao Trono 🚽'}</span>
+              <span>{editingEntry ? 'Salvar Alterações' : 'Confirmar Ida (+1) 💩'}</span>
             </button>
           </div>
         </form>
