@@ -1,24 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trophy, History, Plus, RefreshCw, Trash2, Users, Sparkles, Share2 } from 'lucide-react';
+import { Trophy, History } from 'lucide-react';
 import { onAuthStateChanged, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
 import { Header } from './components/Header';
 import { LeaderboardView } from './components/LeaderboardView';
 import { HistoryTimeline } from './components/HistoryTimeline';
 import { QuickLogModal } from './components/QuickLogModal';
-import { ParticipantsModal } from './components/ParticipantsModal';
 import { ShareRankingModal } from './components/ShareRankingModal';
 import { ToastNotification, ToastMessage } from './components/ToastNotification';
 import { GoogleAuthBanner } from './components/GoogleAuthBanner';
 import { Participant, PoopEntry, Timeframe } from './types';
 import { computeRankings } from './utils/rankingCalculations';
-import { triggerHaptic, playSuccessSound, playPopSound } from './utils/soundEffects';
+import { triggerHaptic, playSuccessSound } from './utils/soundEffects';
 import confetti from 'canvas-confetti';
 import { auth, googleProvider, testConnection } from './lib/firebase';
 import {
   subscribeToParticipants,
   subscribeToEntries,
   saveParticipantToFirestore,
-  deleteParticipantFromFirestore,
   saveEntryToFirestore,
   deleteEntryFromFirestore,
   clearAllFirestoreData,
@@ -46,7 +44,6 @@ export default function App() {
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false);
   const [quickLogParticipantId, setQuickLogParticipantId] = useState<string | undefined>(undefined);
   const [editingEntry, setEditingEntry] = useState<PoopEntry | null>(null);
-  const [isParticipantsModalOpen, setIsParticipantsModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Toasts
@@ -326,39 +323,6 @@ export default function App() {
     setIsQuickLogOpen(true);
   };
 
-  // Participant Actions
-  const handleAddParticipant = async (pData: Omit<Participant, 'id' | 'createdAt'>) => {
-    const newParticipant: Participant = {
-      ...pData,
-      id: `p-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-    };
-    try {
-      await saveParticipantToFirestore(newParticipant);
-      addToast('Amigo Adicionado!', `${newParticipant.name} entrou no torneio!`, newParticipant.avatar);
-    } catch (err) {
-      console.error('Error adding participant:', err);
-    }
-  };
-
-  const handleUpdateParticipant = async (updated: Participant) => {
-    try {
-      await saveParticipantToFirestore(updated);
-      addToast('Amigo Atualizado!', `Dados de ${updated.name} foram salvos.`, updated.avatar);
-    } catch (err) {
-      console.error('Error updating participant:', err);
-    }
-  };
-
-  const handleDeleteParticipant = async (id: string) => {
-    try {
-      await deleteParticipantFromFirestore(id);
-      addToast('Amigo Removido', 'Participante excluído.', '👋');
-    } catch (err) {
-      console.error('Error deleting participant:', err);
-    }
-  };
-
   // Zero database completely
   const handleClearAll = async () => {
     triggerHaptic(20);
@@ -381,7 +345,6 @@ export default function App() {
 
       {/* Header */}
       <Header
-        onOpenParticipants={() => setIsParticipantsModalOpen(true)}
         onOpenShare={() => setIsShareModalOpen(true)}
         soundMuted={soundMuted}
         onToggleSound={handleToggleSound}
@@ -437,14 +400,6 @@ export default function App() {
               <span>Histórico ({entries.length})</span>
             </button>
           </div>
-
-          <button
-            onClick={() => setIsParticipantsModalOpen(true)}
-            className="text-xs font-bold text-stone-600 hover:text-stone-900 flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-stone-100 transition-colors cursor-pointer"
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>+ Amigo</span>
-          </button>
         </div>
 
         {/* Tab 1: Leaderboard */}
@@ -456,7 +411,6 @@ export default function App() {
             onQuickAddPoint={handleQuickAddPoint}
             onOpenNewEntry={() => handleOpenDetailedLog(currentParticipant?.id)}
             onOpenDetailedLog={handleOpenDetailedLog}
-            onOpenAddParticipant={() => setIsParticipantsModalOpen(true)}
             currentUser={currentUser}
             currentParticipant={currentParticipant}
             onSignInWithGoogle={handleSignInWithGoogle}
@@ -486,17 +440,6 @@ export default function App() {
         participants={participants}
         initialParticipantId={quickLogParticipantId || currentParticipant?.id}
         editingEntry={editingEntry}
-        soundMuted={soundMuted}
-        onOpenAddParticipant={() => setIsParticipantsModalOpen(true)}
-      />
-
-      <ParticipantsModal
-        isOpen={isParticipantsModalOpen}
-        onClose={() => setIsParticipantsModalOpen(false)}
-        participants={participants}
-        onAddParticipant={handleAddParticipant}
-        onUpdateParticipant={handleUpdateParticipant}
-        onDeleteParticipant={handleDeleteParticipant}
         soundMuted={soundMuted}
       />
 

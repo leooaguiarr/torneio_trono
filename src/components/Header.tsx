@@ -1,10 +1,9 @@
 import React from 'react';
-import { Users, Share2, Volume2, VolumeX, Trash2, LogIn, LogOut } from 'lucide-react';
+import { Share2, Volume2, VolumeX, Trash2, LogIn, LogOut } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Participant } from '../types';
 
 interface HeaderProps {
-  onOpenParticipants: () => void;
   onOpenShare: () => void;
   soundMuted: boolean;
   onToggleSound: () => void;
@@ -17,7 +16,6 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  onOpenParticipants,
   onOpenShare,
   soundMuted,
   onToggleSound,
@@ -51,12 +49,12 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Top Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Google Auth Quick Pill */}
+          {/* Google Auth Quick Pill / Button */}
           {currentUser ? (
-            <div
-              onClick={onOpenParticipants}
-              className="flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-stone-900 cursor-pointer transition-colors"
-              title={`Conectado como ${currentUser.displayName || 'Você'}`}
+            <button
+              onClick={onSignOut}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-rose-50 border border-amber-300 hover:border-rose-300 text-stone-900 hover:text-rose-700 transition-colors cursor-pointer group shadow-2xs"
+              title="Clique para sair da conta Google"
             >
               {currentUser.photoURL ? (
                 <img
@@ -68,14 +66,15 @@ export const Header: React.FC<HeaderProps> = ({
               ) : (
                 <span className="text-xs">{currentParticipant?.avatar || '👤'}</span>
               )}
-              <span className="text-xs font-bold max-w-[80px] sm:max-w-[110px] truncate hidden xs:inline">
+              <span className="text-xs font-bold max-w-[80px] sm:max-w-[110px] truncate">
                 {currentParticipant?.name || currentUser.displayName?.split(' ')[0] || 'Eu'}
               </span>
-            </div>
+              <LogOut className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition-opacity ml-0.5" />
+            </button>
           ) : (
             <button
               onClick={onSignInWithGoogle}
-              className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-xs font-black text-stone-900 bg-amber-400 hover:bg-amber-500 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+              className="px-3 py-2 rounded-xl text-xs font-black text-stone-900 bg-amber-400 hover:bg-amber-500 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
               title="Entrar com Google"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
@@ -108,17 +107,6 @@ export const Header: React.FC<HeaderProps> = ({
             className="p-2 rounded-xl text-stone-600 hover:text-stone-950 hover:bg-stone-100 border border-stone-200 transition-colors cursor-pointer"
           >
             {soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
-
-          {/* Manage Friends */}
-          <button
-            id="btn-friends"
-            onClick={onOpenParticipants}
-            title="Adicionar ou gerenciar amigos"
-            className="px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold text-stone-800 bg-stone-100 hover:bg-stone-200 border border-stone-200 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Users className="w-4 h-4 text-stone-700" />
-            <span className="hidden sm:inline">Amigos</span>
           </button>
 
           {/* Share WhatsApp */}

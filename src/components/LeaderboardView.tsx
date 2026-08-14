@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trophy, Sparkles, UserPlus, MoreHorizontal, LogIn } from 'lucide-react';
+import { Plus, Trophy, Sparkles, MoreHorizontal, LogIn } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Participant, ParticipantRankingStats, Timeframe } from '../types';
 import { getTimeframeLabel } from '../utils/dateUtils';
@@ -12,7 +12,6 @@ interface LeaderboardViewProps {
   onQuickAddPoint: (participantId: string) => void;
   onOpenNewEntry: () => void;
   onOpenDetailedLog: (participantId?: string) => void;
-  onOpenAddParticipant: () => void;
   currentUser: FirebaseUser | null;
   currentParticipant: Participant | null;
   onSignInWithGoogle: () => void;
@@ -25,7 +24,6 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   onQuickAddPoint,
   onOpenNewEntry,
   onOpenDetailedLog,
-  onOpenAddParticipant,
   currentUser,
   currentParticipant,
   onSignInWithGoogle,
@@ -154,7 +152,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               O Trono está Vazio!
             </h3>
             <p className="text-xs text-stone-600 font-medium max-w-sm mx-auto">
-              Ninguém pontuou ainda. Conecte com o Google para começar o campeonato!
+              Ninguém pontuou ainda. Conecte com sua Conta Google para entrar no ranking!
             </p>
           </div>
           {!currentUser && (

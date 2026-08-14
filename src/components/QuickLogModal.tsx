@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, UserPlus, Clock, Sparkles } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { EFFORT_LEVELS, EffortLevel, LOCATIONS, LocationType, Participant, PoopEntry } from '../types';
 import { formatToDateTimeLocal } from '../utils/dateUtils';
@@ -13,7 +13,6 @@ interface QuickLogModalProps {
   initialParticipantId?: string;
   editingEntry?: PoopEntry | null;
   soundMuted: boolean;
-  onOpenAddParticipant: () => void;
 }
 
 export const QuickLogModal: React.FC<QuickLogModalProps> = ({
@@ -24,7 +23,6 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   initialParticipantId,
   editingEntry,
   soundMuted,
-  onOpenAddParticipant,
 }) => {
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>(
     initialParticipantId || participants[0]?.id || ''
@@ -55,7 +53,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedParticipantId) {
-      alert('Selecione ou adicione quem foi ao banheiro!');
+      alert('Selecione quem foi ao banheiro!');
       return;
     }
 
@@ -92,6 +90,9 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
     onClose();
   };
 
+  const effortList = Object.values(EFFORT_LEVELS);
+  const locationList = Object.values(LOCATIONS);
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-stone-950/60 backdrop-blur-xs overflow-y-auto">
       <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-xl border border-stone-200 overflow-hidden my-0 sm:my-6 max-h-[92vh] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
@@ -120,19 +121,8 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
             </label>
 
             {participants.length === 0 ? (
-              <div className="p-4 rounded-xl border border-dashed border-stone-300 bg-stone-50 text-center space-y-2">
-                <p className="text-xs text-stone-600 font-medium">Nenhum participante ainda!</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenAddParticipant();
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-amber-400 font-black text-xs text-stone-950 inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Cadastrar Primeiro Nome</span>
-                </button>
+              <div className="p-4 rounded-xl border border-dashed border-stone-300 bg-stone-50 text-center space-y-1">
+                <p className="text-xs text-stone-600 font-medium">Nenhum participante conectado ainda.</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
@@ -158,18 +148,6 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
                     </button>
                   );
                 })}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenAddParticipant();
-                  }}
-                  className="p-2.5 rounded-xl border border-dashed border-stone-300 text-stone-600 hover:border-stone-400 hover:bg-stone-50 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>+ Outro amigo</span>
-                </button>
               </div>
             )}
           </div>
@@ -179,26 +157,27 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
             <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-2">
               Nível de Esforço
             </label>
-            <div className="grid grid-cols-5 gap-1.5">
-              {([1, 2, 3, 4, 5] as EffortLevel[]).map((lvl) => {
-                const isSelected = effortLevel === lvl;
-                const info = EFFORT_LEVELS[lvl];
+            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+              {effortList.map((lvl) => {
+                const isSelected = effortLevel === lvl.level;
                 return (
                   <button
-                    key={lvl}
+                    key={lvl.level}
                     type="button"
                     onClick={() => {
                       triggerHaptic(10);
-                      setEffortLevel(lvl);
+                      setEffortLevel(lvl.level);
                     }}
-                    className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer ${
+                    className={`py-2 px-1 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-stone-900 text-white border-stone-900 shadow-xs'
-                        : 'bg-stone-50 border-stone-200 hover:border-stone-300 text-stone-700'
+                        ? 'bg-stone-900 text-white border-stone-900 shadow-xs ring-2 ring-amber-400'
+                        : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
                     }`}
                   >
-                    <span className="text-base block">{info.emoji}</span>
-                    <span className="text-[10px] font-bold block">{info.label}</span>
+                    <span className="text-lg sm:text-xl">{lvl.emoji}</span>
+                    <span className="text-[10px] font-bold truncate max-w-full text-center px-0.5">
+                      {lvl.label}
+                    </span>
                   </button>
                 );
               })}
@@ -207,53 +186,71 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
 
           {/* Step 3: Location */}
           <div>
-            <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-2">
               Local
             </label>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.values(LOCATIONS).map((loc) => {
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {locationList.map((loc) => {
                 const isSelected = location === loc.type;
                 return (
                   <button
                     key={loc.type}
                     type="button"
-                    onClick={() => setLocation(loc.type)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                    onClick={() => {
+                      triggerHaptic(10);
+                      setLocation(loc.type);
+                    }}
+                    className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-amber-100 border-amber-400 text-amber-950'
-                        : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
+                        ? 'bg-amber-100 border-amber-400 text-stone-950 font-bold ring-1 ring-amber-400'
+                        : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100 text-xs font-medium'
                     }`}
                   >
-                    {loc.emoji} {loc.label}
+                    <div className="text-base mb-0.5">{loc.emoji}</div>
+                    <div className="text-[11px] font-bold truncate">{loc.label}</div>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Step 4: Optional Note */}
+          {/* Step 4: Time (Defaults to now) */}
           <div>
-            <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-1">
-              Comentário rápido (Opcional)
+            <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-1.5">
+              Horário da Ida
+            </label>
+            <div className="relative">
+              <input
+                type="datetime-local"
+                value={timestamp}
+                onChange={(e) => setTimestamp(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-xs sm:text-sm font-semibold text-stone-900 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+          </div>
+
+          {/* Step 5: Optional Funny Notes */}
+          <div>
+            <label className="block text-xs font-black text-stone-700 uppercase tracking-wider mb-1.5">
+              Comentário / Zoação (Opcional)
             </label>
             <input
               type="text"
-              placeholder="Ex: Café bateu na hora"
+              placeholder="Ex: 'Quase quebrei a porcelana', 'No horário de trabalho'..."
               value={notes}
+              maxLength={80}
               onChange={(e) => setNotes(e.target.value)}
-              maxLength={60}
-              className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-xs sm:text-sm font-medium text-stone-900 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
           </div>
 
-          {/* Submit */}
+          {/* Submit Button */}
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-3.5 rounded-xl font-black text-sm bg-rose-500 hover:bg-rose-600 text-white shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-500 text-stone-950 font-black text-sm border-2 border-stone-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 text-amber-200" />
-              <span>{editingEntry ? 'Salvar Alterações' : 'Confirmar Ida (+1) 💩'}</span>
+              <span>{editingEntry ? 'Salvar Alterações' : 'Confirmar Ida no Placar! 🏆'}</span>
             </button>
           </div>
         </form>
