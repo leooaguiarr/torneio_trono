@@ -225,6 +225,11 @@ export default function App() {
 
   // 1-Tap Quick Point directly from Ranking Card!
   const handleQuickAddPoint = async (participantId: string) => {
+    if (!currentUser) {
+      handleSignInWithGoogle();
+      return;
+    }
+
     triggerHaptic([20, 30, 40]);
     if (!soundMuted) {
       playSuccessSound(false);
@@ -262,6 +267,11 @@ export default function App() {
   };
 
   const handleSaveEntry = async (entryData: Omit<PoopEntry, 'id'>, existingId?: string) => {
+    if (!currentUser) {
+      handleSignInWithGoogle();
+      return;
+    }
+
     const person = participants.find((p) => p.id === entryData.participantId);
     const personName = person ? person.name : 'Participante';
 
@@ -306,6 +316,10 @@ export default function App() {
   };
 
   const handleOpenDetailedLog = (participantId?: string) => {
+    if (!currentUser) {
+      handleSignInWithGoogle();
+      return;
+    }
     const targetId = participantId || currentParticipant?.id || participants[0]?.id;
     setQuickLogParticipantId(targetId);
     setEditingEntry(null);
@@ -381,7 +395,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-4 sm:py-6 space-y-4 pb-20">
-        {/* Google Sign-in Banner (if not signed in or signed in) */}
+        {/* Google Sign-in Banner */}
         <GoogleAuthBanner
           currentUser={currentUser}
           currentParticipant={currentParticipant}
@@ -443,6 +457,9 @@ export default function App() {
             onOpenNewEntry={() => handleOpenDetailedLog(currentParticipant?.id)}
             onOpenDetailedLog={handleOpenDetailedLog}
             onOpenAddParticipant={() => setIsParticipantsModalOpen(true)}
+            currentUser={currentUser}
+            currentParticipant={currentParticipant}
+            onSignInWithGoogle={handleSignInWithGoogle}
           />
         )}
 
