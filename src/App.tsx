@@ -9,6 +9,7 @@ import { QuickLocationModal } from './components/QuickLocationModal';
 import { WelcomeCagaoModal } from './components/WelcomeCagaoModal';
 import { MonthlyChampionModal } from './components/MonthlyChampionModal';
 import { ShareRankingModal } from './components/ShareRankingModal';
+import { EditRecentEntryModal } from './components/EditRecentEntryModal';
 import { ToastNotification, ToastMessage } from './components/ToastNotification';
 import { GoogleAuthBanner } from './components/GoogleAuthBanner';
 import { Participant, PoopEntry, Timeframe, LocationType, EffortLevel, MonthWinnerRecord } from './types';
@@ -64,6 +65,9 @@ export default function App() {
 
   // Monthly Champion Modal
   const [isChampionModalOpen, setIsChampionModalOpen] = useState<boolean>(false);
+
+  // "Corrigir a cagada" Modal
+  const [isEditRecentModalOpen, setIsEditRecentModalOpen] = useState<boolean>(false);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -549,9 +553,14 @@ export default function App() {
             rankings={rankings}
             timeframe={timeframe}
             onChangeTimeframe={setTimeframe}
-            onQuickAddPoint={handleOpenLocationQuestion}
             onOpenNewEntry={() => handleOpenLocationQuestion(currentParticipant?.id)}
-            onOpenDetailedLog={handleOpenDetailedLog}
+            onOpenEditRecent={() => {
+              if (!currentUser) {
+                handleSignInWithGoogle();
+                return;
+              }
+              setIsEditRecentModalOpen(true);
+            }}
             currentUser={currentUser}
             currentParticipant={currentParticipant}
             onSignInWithGoogle={handleSignInWithGoogle}
@@ -579,6 +588,32 @@ export default function App() {
         participant={locationTargetParticipant}
         onConfirm={handleConfirmLocationPoint}
         soundMuted={soundMuted}
+      />
+
+      {/* "Corrigir a cagada" Modal */}
+      <EditRecentEntryModal
+        isOpen={isEditRecentModalOpen}
+        onClose={() => setIsEditRecentModalOpen(false)}
+        entries={entries}
+        participant={currentParticipant}
+        onUpdateEntry={async (updated) => {
+          try {
+            await saveEntryToFirestore(updated);
+            addToast('Cagada Corrigida!', 'Seus dados foram atualizados com sucesso.', '🛠️');
+          } catch (err) {
+            console.error('Error updating entry:', err);
+            addToast('Erro ao atualizar', 'Não foi possível salvar na nuvem.', '❌');
+          }
+        }}
+        onDeleteEntry={async (id) => {
+          try {
+            await deleteEntryFromFirestore(id);
+            addToast('Ida Cancelada', 'O registro foi removido do placar.', '🗑️');
+          } catch (err) {
+            console.error('Error deleting entry:', err);
+            addToast('Erro ao excluir', 'Não foi possível remover.', '❌');
+          }
+        }}
       />
 
       {/* "Bem-vindo Cagão!" Popup Modal */}

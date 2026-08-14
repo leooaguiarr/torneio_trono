@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trophy, Sparkles, MoreHorizontal, MapPin, Flame, Award } from 'lucide-react';
+import { Plus, Edit3, Undo2 } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Participant, ParticipantRankingStats, Timeframe } from '../types';
 import { getTimeframeLabel } from '../utils/dateUtils';
@@ -10,9 +10,8 @@ interface LeaderboardViewProps {
   rankings: ParticipantRankingStats[];
   timeframe: Timeframe;
   onChangeTimeframe: (tf: Timeframe) => void;
-  onQuickAddPoint: (participantId: string) => void;
   onOpenNewEntry: () => void;
-  onOpenDetailedLog: (participantId?: string) => void;
+  onOpenEditRecent?: () => void;
   currentUser: FirebaseUser | null;
   currentParticipant: Participant | null;
   onSignInWithGoogle: () => void;
@@ -24,9 +23,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   rankings,
   timeframe,
   onChangeTimeframe,
-  onQuickAddPoint,
   onOpenNewEntry,
-  onOpenDetailedLog,
+  onOpenEditRecent,
   currentUser,
   currentParticipant,
   onSignInWithGoogle,
@@ -41,14 +39,33 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     <div className="space-y-4 sm:space-y-5">
       {/* Primary Action Button */}
       {currentUser ? (
-        <button
-          onClick={onOpenNewEntry}
-          className="w-full py-3.5 sm:py-4 px-4 sm:px-5 rounded-2xl bg-amber-400 hover:bg-amber-500 text-stone-950 font-black text-sm sm:text-base border-2 border-stone-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] sm:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer text-center"
-        >
-          <span className="text-xl sm:text-2xl shrink-0">🚽</span>
-          <span className="truncate">REGISTRAR MINHA IDA AO BANHEIRO</span>
-          <Plus className="w-4 h-4 sm:w-5 sm:h-5 stroke-[3] shrink-0" />
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={onOpenNewEntry}
+            className="w-full py-3.5 sm:py-4 px-4 sm:px-5 rounded-2xl bg-amber-400 hover:bg-amber-500 text-stone-950 font-black text-sm sm:text-base border-2 border-stone-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] sm:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer text-center"
+          >
+            <span className="text-xl sm:text-2xl shrink-0">🚽</span>
+            <span className="truncate">REGISTRAR MINHA IDA AO BANHEIRO</span>
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5 stroke-[3] shrink-0" />
+          </button>
+
+          {onOpenEditRecent && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic(10);
+                  onOpenEditRecent();
+                }}
+                className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold border border-stone-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs hover:text-stone-950"
+                title="Corrigir local, esforço ou apagar última ida registrada"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                <span>Corrigir ida (Corrigir a cagada)</span>
+              </button>
+            </div>
+          )}
+        </div>
       ) : (
         <button
           onClick={onSignInWithGoogle}
@@ -333,42 +350,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Right: Total Idas & +1 Button */}
+                  {/* Right: Total Idas Counter Badge */}
                   <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    <div className="text-right pr-0.5 sm:pr-1">
-                      <span className="text-sm sm:text-lg font-black text-stone-950 block leading-tight whitespace-nowrap">
+                    <div className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-100/70 border border-amber-300/80 text-center">
+                      <span className="text-sm sm:text-base font-black text-amber-950 block leading-tight whitespace-nowrap">
                         {rank.totalCount} {rank.totalCount === 1 ? 'ida' : 'idas'}
                       </span>
                     </div>
-
-                    {currentUser ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => onQuickAddPoint(rank.participant.id)}
-                          className="px-2.5 py-1.5 sm:px-3.5 sm:py-2.5 rounded-xl font-black text-xs sm:text-sm bg-amber-400 hover:bg-amber-500 text-stone-950 border border-stone-900 shadow-2xs transition-all active:scale-95 flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                          title={`Registrar +1 para ${rank.participant.name}`}
-                        >
-                          <Plus className="w-3.5 h-3.5 stroke-[3] shrink-0" />
-                          <span>+1 Ida</span>
-                        </button>
-
-                        <button
-                          onClick={() => onOpenDetailedLog(rank.participant.id)}
-                          className="p-1.5 sm:p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer shrink-0"
-                          title="Opções / Registro detalhado"
-                        >
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={onSignInWithGoogle}
-                        className="px-2.5 py-1.5 rounded-xl font-bold text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors cursor-pointer"
-                        title="Faça login para pontuar"
-                      >
-                        Login
-                      </button>
-                    )}
                   </div>
                 </div>
 

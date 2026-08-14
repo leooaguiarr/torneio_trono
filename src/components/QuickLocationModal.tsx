@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, Sparkles, MapPin } from 'lucide-react';
+import { X, Check, Sparkles, MapPin, ArrowLeft } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { LocationType, EffortLevel, Participant, EFFORT_LEVELS } from '../types';
 import { triggerHaptic, playFartSound } from '../utils/soundEffects';
@@ -110,9 +110,14 @@ export const QuickLocationModal: React.FC<QuickLocationModalProps> = ({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-amber-50/70">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-amber-400 border border-stone-900/20 flex items-center justify-center text-xl shrink-0">
-              🚽
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-xl bg-white hover:bg-stone-100 border border-stone-300 text-stone-700 transition-colors cursor-pointer"
+              title="Voltar ao início"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
             <div>
               <h2 className="font-['Outfit',sans-serif] text-base sm:text-lg font-black text-stone-900 leading-tight">
                 Onde foi a obra de arte?
@@ -124,6 +129,7 @@ export const QuickLocationModal: React.FC<QuickLocationModalProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-200 transition-colors cursor-pointer"
           >
@@ -220,13 +226,22 @@ export const QuickLocationModal: React.FC<QuickLocationModalProps> = ({
             </div>
           </div>
 
-          {/* Confirm Button */}
-          <div className="pt-2">
+          {/* Action Buttons */}
+          <div className="pt-2 space-y-2">
             <button
               type="submit"
               className="w-full py-3.5 px-4 rounded-2xl bg-amber-400 hover:bg-amber-500 text-stone-950 font-black text-sm sm:text-base border-2 border-stone-900 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>CONFIRMAR +1 IDA NO PLACAR! 🏆</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-2.5 px-4 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs border border-stone-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Voltar sem salvar</span>
             </button>
           </div>
         </form>

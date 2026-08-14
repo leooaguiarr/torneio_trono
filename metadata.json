@@ -1,6 +1,1 @@
-{
-  "name": "Torneio do Trono",
-  "description": "Contabilidade de idas ao banheiro entre amigos com registro de horário, nível de esforço e ranking semanal e mensal.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
+{"name":"Torneio do Trono","description":"Contabilidade de idas ao banheiro entre amigos com registro de horário, nível de esforço e ranking semanal e mensal.","requestFramePermissions":[],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}

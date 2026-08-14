@@ -81,6 +81,53 @@
         }
       },
       "required": ["id", "participantId", "timestamp", "effortLevel"]
+    },
+    "MonthWinnerRecord": {
+      "title": "MonthWinnerRecord",
+      "description": "Information about the reigning champion of the previous month",
+      "type": "object",
+      "properties": {
+        "monthKey": {
+          "type": "string",
+          "description": "Identifier key for the month (e.g. 2026-07)",
+          "maxLength": 20
+        },
+        "monthName": {
+          "type": "string",
+          "description": "Formatted name of the month",
+          "maxLength": 60
+        },
+        "participantId": {
+          "type": "string",
+          "description": "ID of winning participant",
+          "maxLength": 128
+        },
+        "participantName": {
+          "type": "string",
+          "description": "Name of winning participant",
+          "maxLength": 60
+        },
+        "participantAvatar": {
+          "type": "string",
+          "description": "Avatar of winning participant",
+          "maxLength": 10
+        },
+        "nickname": {
+          "type": "string",
+          "description": "Champion nickname",
+          "maxLength": 60
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total visits logged by the champion in that month"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO timestamp when champion was crowned",
+          "maxLength": 40
+        }
+      },
+      "required": ["monthKey", "monthName", "participantId", "participantName", "totalCount", "timestamp"]
     }
   },
   "firestore": {
@@ -91,6 +138,10 @@
     "/entries/{entryId}": {
       "schema": "PoopEntry",
       "description": "Collection of logged bathroom entries for the leaderboard and stats"
+    },
+    "/metadata/{docId}": {
+      "schema": "MonthWinnerRecord",
+      "description": "App metadata including monthly champions record"
     }
   }
 }

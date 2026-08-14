@@ -61,5 +61,11 @@ service cloud.firestore {
       allow update: if isValidId(entryId) && isValidPoopEntry(incoming()) && incoming().id == existing().id;
       allow delete: if isValidId(entryId);
     }
+
+    // App Metadata (Monthly Winners & Champions)
+    match /metadata/{docId} {
+      allow read: if true;
+      allow write: if isValidId(docId);
+    }
   }
 }
