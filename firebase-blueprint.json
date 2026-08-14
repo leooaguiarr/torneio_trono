@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "Participant": {
+      "title": "Participant",
+      "description": "A competitor in the Torneio do Trono league",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the participant"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the competitor",
+          "maxLength": 60
+        },
+        "nickname": {
+          "type": "string",
+          "description": "Humorous title or nickname",
+          "maxLength": 60
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Emoji character representing the participant",
+          "maxLength": 10
+        },
+        "color": {
+          "type": "string",
+          "description": "Color theme token for the participant card",
+          "maxLength": 30
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp when the participant was added"
+        }
+      },
+      "required": ["id", "name", "avatar", "color", "createdAt"]
+    },
+    "PoopEntry": {
+      "title": "PoopEntry",
+      "description": "A logged bathroom visit with effort level, timing and details",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the entry"
+        },
+        "participantId": {
+          "type": "string",
+          "description": "ID of the participant who logged this entry",
+          "maxLength": 128
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO string timestamp of the bathroom visit",
+          "maxLength": 40
+        },
+        "effortLevel": {
+          "type": "number",
+          "description": "Effort score from 1 (easy) to 5 (epic/volcanic)",
+          "enum": [1, 2, 3, 4, 5]
+        },
+        "durationMinutes": {
+          "type": "number",
+          "description": "Duration spent on the throne in minutes"
+        },
+        "location": {
+          "type": "string",
+          "description": "Location category (casa, trabalho, rua, amigo, viagem, outro)",
+          "maxLength": 30
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes or amusing context",
+          "maxLength": 200
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "User ID of the person who recorded this entry",
+          "maxLength": 128
+        }
+      },
+      "required": ["id", "participantId", "timestamp", "effortLevel"]
+    }
+  },
+  "firestore": {
+    "/participants/{participantId}": {
+      "schema": "Participant",
+      "description": "Collection of league competitors"
+    },
+    "/entries/{entryId}": {
+      "schema": "PoopEntry",
+      "description": "Collection of logged bathroom entries for the leaderboard and stats"
+    }
+  }
+}

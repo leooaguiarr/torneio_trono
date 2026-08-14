@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidParticipant(data) {
+      return data.keys().hasAll(['id', 'name', 'avatar', 'color', 'createdAt']) &&
+        data.id is string && isValidId(data.id) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 60 &&
+        data.avatar is string && data.avatar.size() > 0 && data.avatar.size() <= 10 &&
+        data.color is string && data.color.size() > 0 && data.color.size() <= 30 &&
+        data.createdAt is string && data.createdAt.size() <= 40 &&
+        (!('nickname' in data) || (data.nickname is string && data.nickname.size() <= 60));
+    }
+
+    function isValidPoopEntry(data) {
+      return data.keys().hasAll(['id', 'participantId', 'timestamp', 'effortLevel']) &&
+        data.id is string && isValidId(data.id) &&
+        data.participantId is string && isValidId(data.participantId) &&
+        data.timestamp is string && data.timestamp.size() > 0 && data.timestamp.size() <= 40 &&
+        data.effortLevel is int && data.effortLevel >= 1 && data.effortLevel <= 5 &&
+        (!('durationMinutes' in data) || (data.durationMinutes is int && data.durationMinutes >= 1 && data.durationMinutes <= 300)) &&
+        (!('location' in data) || (data.location is string && data.location.size() <= 30)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 200)) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128));
+    }
+
+    // Participants Collection
+    match /participants/{participantId} {
+      allow read: if true;
+      allow create: if isValidId(participantId) && isValidParticipant(incoming()) && incoming().id == participantId;
+      allow update: if isValidId(participantId) && isValidParticipant(incoming()) && incoming().id == existing().id && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(participantId);
+    }
+
+    // Entries Collection
+    match /entries/{entryId} {
+      allow read: if true;
+      allow create: if isValidId(entryId) && isValidPoopEntry(incoming()) && incoming().id == entryId;
+      allow update: if isValidId(entryId) && isValidPoopEntry(incoming()) && incoming().id == existing().id;
+      allow delete: if isValidId(entryId);
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Trophy, History, BarChart3, Plus, Sparkles, RefreshCw, Trash2, Users } from 'lucide-react';
+import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { Header } from './components/Header';
 import { LeaderboardView } from './components/LeaderboardView';
 import { HistoryTimeline } from './components/HistoryTimeline';
@@ -13,39 +14,29 @@ import { Participant, PoopEntry, Timeframe } from './types';
 import { INITIAL_PARTICIPANTS, generateSeedEntries } from './data/initialData';
 import { computeRankings } from './utils/rankingCalculations';
 import { triggerHaptic } from './utils/soundEffects';
+import { auth, googleProvider, testConnection } from './lib/firebase';
+import {
+  subscribeToParticipants,
+  subscribeToEntries,
+  saveParticipantToFirestore,
+  deleteParticipantFromFirestore,
+  saveEntryToFirestore,
+  deleteEntryFromFirestore,
+  resetFirestoreToSample,
+  clearAllEntriesFromFirestore,
+  seedInitialFirestoreData,
+} from './services/firestoreService';
 
-const STORAGE_KEY_PARTICIPANTS = 'torneio_trono_participants_v2';
-const STORAGE_KEY_ENTRIES = 'torneio_trono_entries_v2';
 const STORAGE_KEY_SOUND = 'torneio_trono_sound_muted';
 
 export default function App() {
-  // Participants State
-  const [participants, setParticipants] = useState<Participant[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_PARTICIPANTS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-    return INITIAL_PARTICIPANTS;
-  });
+  // Auth state
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Entries State
-  const [entries, setEntries] = useState<PoopEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_ENTRIES);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-    return generateSeedEntries();
-  });
+  // Firestore Real-Time Data State
+  const [participants, setParticipants] = useState<Participant[]>(INITIAL_PARTICIPANTS);
+  const [entries, setEntries] = useState<PoopEntry[]>([]);
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(true);
 
   // UI States
   const [activeTab, setActiveTab] = useState<'ranking' | 'feed' | 'stats'>('ranking');
@@ -82,23 +73,6 @@ export default function App() {
     }
   });
 
-  // Save to LocalStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_PARTICIPANTS, JSON.stringify(participants));
-    } catch {
-      // ignore
-    }
-  }, [participants]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_ENTRIES, JSON.stringify(entries));
-    } catch {
-      // ignore
-    }
-  }, [entries]);
-
   const handleToggleSound = () => {
     triggerHaptic(10);
     setSoundMuted((prev) => {
@@ -112,36 +86,121 @@ export default function App() {
     });
   };
 
-  // Compute rankings
+  // 1. Initialize Firebase connection and Listeners on Mount
+  useEffect(() => {
+    // Validate connection to Firestore
+    testConnection();
+
+    // Listen to Firebase Auth
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+
+    // Check & seed initial sample data if empty
+    seedInitialFirestoreData(INITIAL_PARTICIPANTS, generateSeedEntries()).catch((err) => {
+      console.error('Error seeding initial Firestore data:', err);
+    });
+
+    // Real-time Participants Listener
+    const unsubParticipants = subscribeToParticipants(
+      (updatedParticipants) => {
+        if (updatedParticipants.length > 0) {
+          setParticipants(updatedParticipants);
+        }
+        setIsCloudSyncing(true);
+      },
+      (err) => {
+        console.error('Participants subscription error:', err);
+        setIsCloudSyncing(false);
+      }
+    );
+
+    // Real-time Entries Listener
+    const unsubEntries = subscribeToEntries(
+      (updatedEntries) => {
+        setEntries(updatedEntries);
+        setIsCloudSyncing(true);
+      },
+      (err) => {
+        console.error('Entries subscription error:', err);
+        setIsCloudSyncing(false);
+      }
+    );
+
+    return () => {
+      unsubscribeAuth();
+      unsubParticipants();
+      unsubEntries();
+    };
+  }, []);
+
+  // Google Login / Logout
+  const handleLoginGoogle = async () => {
+    triggerHaptic(15);
+    try {
+      const res = await signInWithPopup(auth, googleProvider);
+      addToast('Conectado!', `Bem-vindo, ${res.user.displayName || 'Competidor'}!`, '🎉');
+    } catch (err: unknown) {
+      console.error('Google Sign In error:', err);
+      addToast('Aviso', 'Não foi possível conectar com o Google.', '⚠️');
+    }
+  };
+
+  const handleLogout = async () => {
+    triggerHaptic(10);
+    try {
+      await signOut(auth);
+      addToast('Desconectado', 'Sua sessão foi encerrada.', '👋');
+    } catch (err) {
+      console.error('Sign Out error:', err);
+    }
+  };
+
+  // Compute rankings reactively
   const rankings = useMemo(() => {
     return computeRankings(participants, entries, timeframe);
   }, [participants, entries, timeframe]);
 
-  // Entry Actions
-  const handleSaveEntry = (entryData: Omit<PoopEntry, 'id'>, existingId?: string) => {
+  // Entry Actions (Synced directly to Firestore)
+  const handleSaveEntry = async (entryData: Omit<PoopEntry, 'id'>, existingId?: string) => {
     const person = participants.find((p) => p.id === entryData.participantId);
     const personName = person ? person.name : 'Participante';
 
-    if (existingId) {
-      setEntries((prev) =>
-        prev.map((e) => (e.id === existingId ? { ...entryData, id: existingId } : e))
-      );
-      addToast('Entrada Atualizada!', `Registro de ${personName} foi modificado.`, '✏️');
-    } else {
-      const newEntry: PoopEntry = {
-        ...entryData,
-        id: `entry-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      };
-      setEntries((prev) => [newEntry, ...prev]);
-      addToast('Novo Ponto no Ranking!', `${personName} pontuou no Torneio do Trono!`, '🚽');
+    try {
+      if (existingId) {
+        const updatedEntry: PoopEntry = {
+          ...entryData,
+          id: existingId,
+          createdBy: currentUser?.uid || undefined,
+        };
+        await saveEntryToFirestore(updatedEntry);
+        addToast('Entrada Atualizada!', `Registro de ${personName} salvo na nuvem.`, '✏️');
+      } else {
+        const newId = `entry-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        const newEntry: PoopEntry = {
+          ...entryData,
+          id: newId,
+          createdBy: currentUser?.uid || undefined,
+        };
+        await saveEntryToFirestore(newEntry);
+        addToast('Novo Ponto no Ranking!', `${personName} pontuou no Torneio do Trono!`, '🚽');
+      }
+    } catch (err) {
+      console.error('Error saving entry:', err);
+      addToast('Erro ao salvar', 'Não foi possível gravar na nuvem.', '❌');
     }
     setEditingEntry(null);
   };
 
-  const handleDeleteEntry = (id: string) => {
+  const handleDeleteEntry = async (id: string) => {
     triggerHaptic(20);
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-    addToast('Registro Excluído', 'A ida ao banheiro foi removida do placar.', '🗑️');
+    try {
+      await deleteEntryFromFirestore(id);
+      addToast('Registro Excluído', 'A ida ao banheiro foi removida do placar.', '🗑️');
+    } catch (err) {
+      console.error('Error deleting entry:', err);
+      addToast('Erro ao excluir', 'Não foi possível remover da nuvem.', '❌');
+    }
   };
 
   const handleEditEntry = (entry: PoopEntry) => {
@@ -161,44 +220,67 @@ export default function App() {
     setIsQuickLogOpen(true);
   };
 
-  // Participant Actions
-  const handleAddParticipant = (pData: Omit<Participant, 'id' | 'createdAt'>) => {
+  // Participant Actions (Synced to Firestore)
+  const handleAddParticipant = async (pData: Omit<Participant, 'id' | 'createdAt'>) => {
     const newParticipant: Participant = {
       ...pData,
       id: `p-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
-    setParticipants((prev) => [...prev, newParticipant]);
-    addToast('Amigo Adicionado!', `${newParticipant.name} entrou na disputa do trono!`, newParticipant.avatar);
-  };
-
-  const handleUpdateParticipant = (updated: Participant) => {
-    setParticipants((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    addToast('Perfil Atualizado!', `Dados de ${updated.name} foram salvos.`, updated.avatar);
-  };
-
-  const handleDeleteParticipant = (id: string) => {
-    setParticipants((prev) => prev.filter((p) => p.id !== id));
-    setEntries((prev) => prev.filter((e) => e.participantId !== id));
-    addToast('Competidor Removido', 'Participante e suas entradas foram excluídos.', '👋');
-  };
-
-  const handleResetData = () => {
-    if (window.confirm('Deseja recarregar os dados de exemplo da Liga do Trono?')) {
-      setParticipants(INITIAL_PARTICIPANTS);
-      setEntries(generateSeedEntries());
-      addToast('Dados Recarregados', 'Campeonato restaurado com dados de exemplo.', '✨');
+    try {
+      await saveParticipantToFirestore(newParticipant);
+      addToast('Amigo Adicionado!', `${newParticipant.name} entrou na disputa do trono!`, newParticipant.avatar);
+    } catch (err) {
+      console.error('Error adding participant:', err);
+      addToast('Erro', 'Não foi possível salvar o amigo no banco.', '❌');
     }
   };
 
-  const handleClearAllData = () => {
+  const handleUpdateParticipant = async (updated: Participant) => {
+    try {
+      await saveParticipantToFirestore(updated);
+      addToast('Perfil Atualizado!', `Dados de ${updated.name} foram salvos.`, updated.avatar);
+    } catch (err) {
+      console.error('Error updating participant:', err);
+      addToast('Erro', 'Não foi possível atualizar o participante.', '❌');
+    }
+  };
+
+  const handleDeleteParticipant = async (id: string) => {
+    try {
+      await deleteParticipantFromFirestore(id);
+      addToast('Competidor Removido', 'Participante excluído da liga.', '👋');
+    } catch (err) {
+      console.error('Error deleting participant:', err);
+      addToast('Erro', 'Não foi possível excluir o participante.', '❌');
+    }
+  };
+
+  const handleResetData = async () => {
+    if (window.confirm('Deseja recarregar os dados de exemplo da Liga do Trono na nuvem Firebase?')) {
+      try {
+        await resetFirestoreToSample();
+        addToast('Dados Recarregados', 'Campeonato restaurado com dados de exemplo.', '✨');
+      } catch (err) {
+        console.error('Error resetting data:', err);
+        addToast('Erro', 'Falha ao restaurar dados de exemplo.', '❌');
+      }
+    }
+  };
+
+  const handleClearAllData = async () => {
     if (
       window.confirm(
-        'ATENÇÃO: Deseja zerar todos os registros de idas ao banheiro? Essa ação não pode ser desfeita.'
+        'ATENÇÃO: Deseja zerar todos os registros de idas ao banheiro na nuvem? Essa ação não pode ser desfeita.'
       )
     ) {
-      setEntries([]);
-      addToast('Placar Zerado', 'Todos os registros foram limpos para novo campeonato.', '🧹');
+      try {
+        await clearAllEntriesFromFirestore();
+        addToast('Placar Zerado', 'Todos os registros foram limpos para novo campeonato.', '🧹');
+      } catch (err) {
+        console.error('Error clearing entries:', err);
+        addToast('Erro', 'Falha ao zerar registros.', '❌');
+      }
     }
   };
 
@@ -216,6 +298,10 @@ export default function App() {
         soundMuted={soundMuted}
         onToggleSound={handleToggleSound}
         totalEntriesCount={entries.length}
+        isCloudSyncing={isCloudSyncing}
+        currentUser={currentUser}
+        onLoginGoogle={handleLoginGoogle}
+        onLogout={handleLogout}
       />
 
       {/* Main Container */}
@@ -321,7 +407,7 @@ export default function App() {
         {/* Bottom Utility Bar (Reset & Clear) */}
         <div className="pt-6 pb-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-700 font-bold border-t-2 border-stone-900/10">
           <div className="flex items-center gap-2">
-            <span>🚽 <strong>Torneio do Trono</strong> • Liga dos Amigos</span>
+            <span>🚽 <strong>Torneio do Trono</strong> • Conectado ao Firebase Firestore</span>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -329,7 +415,7 @@ export default function App() {
               className="hover:text-stone-950 hover:underline transition-colors flex items-center gap-1 cursor-pointer font-extrabold"
             >
               <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Recarregar Exemplo</span>
+              <span>Recarregar Exemplo na Nuvem</span>
             </button>
             <span>•</span>
             <button
@@ -337,7 +423,7 @@ export default function App() {
               className="hover:text-rose-600 hover:underline transition-colors flex items-center gap-1 cursor-pointer font-extrabold"
             >
               <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Zerar Registros</span>
+              <span>Zerar Placar na Nuvem</span>
             </button>
           </div>
         </div>

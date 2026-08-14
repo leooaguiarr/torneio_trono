@@ -100,6 +100,7 @@ export interface PoopEntry {
   location?: LocationType;
   notes?: string;
   bristolScale?: number; // 1 to 7
+  createdBy?: string;
 }
 
 export type Timeframe = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'all_time';
