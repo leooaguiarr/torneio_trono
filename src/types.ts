@@ -89,6 +89,9 @@ export interface Participant {
   avatar: string; // Emoji
   color: string; // e.g. 'amber', 'emerald', 'blue', 'purple', 'rose', 'indigo'
   createdAt: string;
+  userId?: string; // Firebase Auth UID
+  email?: string;
+  photoURL?: string;
 }
 
 export interface PoopEntry {

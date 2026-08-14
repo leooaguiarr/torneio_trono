@@ -36,6 +36,9 @@ export function subscribeToParticipants(
             avatar: data.avatar,
             color: data.color,
             createdAt: data.createdAt,
+            userId: data.userId,
+            email: data.email,
+            photoURL: data.photoURL,
           });
         });
         // Sort by createdAt ascending
@@ -165,6 +168,9 @@ export async function saveParticipantToFirestore(participant: Participant) {
       createdAt: participant.createdAt || new Date().toISOString(),
     };
     if (participant.nickname) dataToSave.nickname = participant.nickname;
+    if (participant.userId) dataToSave.userId = participant.userId;
+    if (participant.email) dataToSave.email = participant.email;
+    if (participant.photoURL) dataToSave.photoURL = participant.photoURL;
     await setDoc(docRef, dataToSave, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);

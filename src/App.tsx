@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Trophy, History, Plus, RefreshCw, Trash2, Users, Sparkles, Share2 } from 'lucide-react';
+import { onAuthStateChanged, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
 import { Header } from './components/Header';
 import { LeaderboardView } from './components/LeaderboardView';
 import { HistoryTimeline } from './components/HistoryTimeline';
@@ -7,11 +8,12 @@ import { QuickLogModal } from './components/QuickLogModal';
 import { ParticipantsModal } from './components/ParticipantsModal';
 import { ShareRankingModal } from './components/ShareRankingModal';
 import { ToastNotification, ToastMessage } from './components/ToastNotification';
+import { GoogleAuthBanner } from './components/GoogleAuthBanner';
 import { Participant, PoopEntry, Timeframe } from './types';
 import { computeRankings } from './utils/rankingCalculations';
 import { triggerHaptic, playSuccessSound, playPopSound } from './utils/soundEffects';
 import confetti from 'canvas-confetti';
-import { testConnection } from './lib/firebase';
+import { auth, googleProvider, testConnection } from './lib/firebase';
 import {
   subscribeToParticipants,
   subscribeToEntries,
@@ -24,11 +26,17 @@ import {
 
 const STORAGE_KEY_SOUND = 'torneio_trono_sound_muted';
 
+const AVATAR_OPTIONS = ['👑', '⚡', '🦁', '🦖', '🤠', '🥷', '🚀', '🔥', '🧘', '🍕', '💩', '🥑', '🌮', '☕', '👾', '🎯'];
+
 export default function App() {
   // Real Firestore Data
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [entries, setEntries] = useState<PoopEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Auth state
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState<boolean>(false);
 
   // Tab: 'ranking' or 'history'
   const [activeTab, setActiveTab] = useState<'ranking' | 'history'>('ranking');
@@ -78,7 +86,51 @@ export default function App() {
     });
   };
 
-  // 1. Firebase Listeners (Live Sync)
+  // 1. Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        // Auto register / match participant profile if user signs in
+        try {
+          const existingParticipant = participants.find(
+            (p) => p.userId === user.uid || (p.email && user.email && p.email.toLowerCase() === user.email.toLowerCase())
+          );
+
+          if (!existingParticipant) {
+            // Pick a random avatar
+            const randomAvatar = AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)];
+            const newParticipant: Participant = {
+              id: `p-${user.uid.substring(0, 10)}`,
+              name: user.displayName || user.email?.split('@')[0] || 'Guerreiro(a)',
+              avatar: randomAvatar,
+              color: 'amber',
+              createdAt: new Date().toISOString(),
+              userId: user.uid,
+              email: user.email || undefined,
+              photoURL: user.photoURL || undefined,
+            };
+            await saveParticipantToFirestore(newParticipant);
+            addToast('Bem-vindo(a) ao Torneio!', `${newParticipant.name} entrou no ranking!`, randomAvatar);
+          } else if (!existingParticipant.userId) {
+            // Link existing participant with userId
+            await saveParticipantToFirestore({
+              ...existingParticipant,
+              userId: user.uid,
+              email: user.email || existingParticipant.email,
+              photoURL: user.photoURL || existingParticipant.photoURL,
+            });
+          }
+        } catch (err) {
+          console.error('Error auto-syncing Google participant:', err);
+        }
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, [participants]);
+
+  // 2. Firebase Listeners (Live Sync for Data)
   useEffect(() => {
     testConnection();
 
@@ -108,9 +160,68 @@ export default function App() {
     };
   }, []);
 
+  // Compute matched current participant
+  const currentParticipant = useMemo(() => {
+    if (!currentUser) return null;
+    return participants.find(
+      (p) =>
+        p.userId === currentUser.uid ||
+        (p.email && currentUser.email && p.email.toLowerCase() === currentUser.email.toLowerCase())
+    ) || null;
+  }, [currentUser, participants]);
+
   const rankings = useMemo(() => {
     return computeRankings(participants, entries, timeframe);
   }, [participants, entries, timeframe]);
+
+  // Sign In with Google
+  const handleSignInWithGoogle = async () => {
+    triggerHaptic(20);
+    setIsSigningIn(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      // Check if already in participants
+      const exists = participants.some(
+        (p) => p.userId === user.uid || (p.email && user.email && p.email.toLowerCase() === user.email.toLowerCase())
+      );
+
+      if (!exists) {
+        const randomAvatar = AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)];
+        const newParticipant: Participant = {
+          id: `p-${user.uid.substring(0, 10)}`,
+          name: user.displayName || user.email?.split('@')[0] || 'Guerreiro(a)',
+          avatar: randomAvatar,
+          color: 'amber',
+          createdAt: new Date().toISOString(),
+          userId: user.uid,
+          email: user.email || undefined,
+          photoURL: user.photoURL || undefined,
+        };
+        await saveParticipantToFirestore(newParticipant);
+      }
+
+      addToast('Conectado com sucesso!', `Olá, ${user.displayName || 'Guerreiro'}!`, '🎉');
+    } catch (err: any) {
+      console.error('Error signing in with Google:', err);
+      if (err.code !== 'auth/popup-closed-by-user') {
+        addToast('Erro ao entrar', 'Não foi possível conectar com o Google.', '⚠️');
+      }
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    triggerHaptic(15);
+    try {
+      await signOut(auth);
+      addToast('Desconectado', 'Você saiu da sua conta Google.', '👋');
+    } catch (err) {
+      console.error('Error signing out:', err);
+    }
+  };
 
   // 1-Tap Quick Point directly from Ranking Card!
   const handleQuickAddPoint = async (participantId: string) => {
@@ -138,6 +249,7 @@ export default function App() {
       timestamp: new Date().toISOString(),
       effortLevel: 3,
       location: 'casa',
+      createdBy: currentUser?.uid,
     };
 
     try {
@@ -166,6 +278,7 @@ export default function App() {
         const newEntry: PoopEntry = {
           ...entryData,
           id: newId,
+          createdBy: currentUser?.uid,
         };
         await saveEntryToFirestore(newEntry);
         addToast('Ida Registrada!', `${personName} pontuou no Torneio!`, person?.avatar || '🚽');
@@ -193,7 +306,8 @@ export default function App() {
   };
 
   const handleOpenDetailedLog = (participantId?: string) => {
-    setQuickLogParticipantId(participantId || participants[0]?.id);
+    const targetId = participantId || currentParticipant?.id || participants[0]?.id;
+    setQuickLogParticipantId(targetId);
     setEditingEntry(null);
     setIsQuickLogOpen(true);
   };
@@ -259,10 +373,23 @@ export default function App() {
         onToggleSound={handleToggleSound}
         totalEntriesCount={entries.length}
         onClearAll={handleClearAll}
+        currentUser={currentUser}
+        currentParticipant={currentParticipant}
+        onSignInWithGoogle={handleSignInWithGoogle}
+        onSignOut={handleSignOut}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-5 sm:py-6 space-y-4 pb-20">
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-4 sm:py-6 space-y-4 pb-20">
+        {/* Google Sign-in Banner (if not signed in or signed in) */}
+        <GoogleAuthBanner
+          currentUser={currentUser}
+          currentParticipant={currentParticipant}
+          onSignInWithGoogle={handleSignInWithGoogle}
+          onSignOut={handleSignOut}
+          isSigningIn={isSigningIn}
+        />
+
         {/* Navigation Tabs */}
         <div className="flex items-center justify-between gap-2 border-b border-stone-200 pb-3">
           <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl border border-stone-200">
@@ -313,7 +440,7 @@ export default function App() {
             timeframe={timeframe}
             onChangeTimeframe={setTimeframe}
             onQuickAddPoint={handleQuickAddPoint}
-            onOpenNewEntry={() => handleOpenDetailedLog()}
+            onOpenNewEntry={() => handleOpenDetailedLog(currentParticipant?.id)}
             onOpenDetailedLog={handleOpenDetailedLog}
             onOpenAddParticipant={() => setIsParticipantsModalOpen(true)}
           />
@@ -326,7 +453,7 @@ export default function App() {
             participants={participants}
             onEditEntry={handleEditEntry}
             onDeleteEntry={handleDeleteEntry}
-            onOpenNewEntry={() => handleOpenDetailedLog()}
+            onOpenNewEntry={() => handleOpenDetailedLog(currentParticipant?.id)}
           />
         )}
       </main>
@@ -340,7 +467,7 @@ export default function App() {
         }}
         onSave={handleSaveEntry}
         participants={participants}
-        initialParticipantId={quickLogParticipantId}
+        initialParticipantId={quickLogParticipantId || currentParticipant?.id}
         editingEntry={editingEntry}
         soundMuted={soundMuted}
         onOpenAddParticipant={() => setIsParticipantsModalOpen(true)}
