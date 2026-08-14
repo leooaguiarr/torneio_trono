@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trophy, History, BarChart3, Plus, Sparkles, RefreshCw, Trash2, Users } from 'lucide-react';
+import { Trophy, History, Plus, RefreshCw, Trash2, Users, Sparkles, Share2 } from 'lucide-react';
 import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { Header } from './components/Header';
 import { LeaderboardView } from './components/LeaderboardView';
 import { HistoryTimeline } from './components/HistoryTimeline';
-import { StatsDashboard } from './components/StatsDashboard';
 import { QuickLogModal } from './components/QuickLogModal';
 import { ParticipantsModal } from './components/ParticipantsModal';
 import { ShareRankingModal } from './components/ShareRankingModal';
-import { MobileBottomNav } from './components/MobileBottomNav';
 import { ToastNotification, ToastMessage } from './components/ToastNotification';
 import { Participant, PoopEntry, Timeframe } from './types';
 import { INITIAL_PARTICIPANTS, generateSeedEntries } from './data/initialData';
 import { computeRankings } from './utils/rankingCalculations';
-import { triggerHaptic } from './utils/soundEffects';
+import { triggerHaptic, playSuccessSound, playPopSound } from './utils/soundEffects';
+import confetti from 'canvas-confetti';
 import { auth, googleProvider, testConnection } from './lib/firebase';
 import {
   subscribeToParticipants,
@@ -30,16 +29,15 @@ import {
 const STORAGE_KEY_SOUND = 'torneio_trono_sound_muted';
 
 export default function App() {
-  // Auth state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Firestore Real-Time Data State
+  // Data State
   const [participants, setParticipants] = useState<Participant[]>(INITIAL_PARTICIPANTS);
   const [entries, setEntries] = useState<PoopEntry[]>([]);
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(true);
 
-  // UI States
-  const [activeTab, setActiveTab] = useState<'ranking' | 'feed' | 'stats'>('ranking');
+  // Tab: 'ranking' or 'history'
+  const [activeTab, setActiveTab] = useState<'ranking' | 'history'>('ranking');
   const [timeframe, setTimeframe] = useState<Timeframe>('this_week');
 
   // Modals
@@ -57,7 +55,7 @@ export default function App() {
     setToasts((prev) => [...prev, { id, title, message, emoji }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3200);
+    }, 2800);
   };
 
   const handleDismissToast = (id: string) => {
@@ -86,22 +84,19 @@ export default function App() {
     });
   };
 
-  // 1. Initialize Firebase connection and Listeners on Mount
+  // 1. Firebase Listeners
   useEffect(() => {
-    // Validate connection to Firestore
     testConnection();
 
-    // Listen to Firebase Auth
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
     });
 
-    // Check & seed initial sample data if empty
+    // Seed if empty
     seedInitialFirestoreData(INITIAL_PARTICIPANTS, generateSeedEntries()).catch((err) => {
       console.error('Error seeding initial Firestore data:', err);
     });
 
-    // Real-time Participants Listener
     const unsubParticipants = subscribeToParticipants(
       (updatedParticipants) => {
         if (updatedParticipants.length > 0) {
@@ -115,7 +110,6 @@ export default function App() {
       }
     );
 
-    // Real-time Entries Listener
     const unsubEntries = subscribeToEntries(
       (updatedEntries) => {
         setEntries(updatedEntries);
@@ -134,14 +128,12 @@ export default function App() {
     };
   }, []);
 
-  // Google Login / Logout
   const handleLoginGoogle = async () => {
     triggerHaptic(15);
     try {
       const res = await signInWithPopup(auth, googleProvider);
       addToast('Conectado!', `Bem-vindo, ${res.user.displayName || 'Competidor'}!`, '🎉');
-    } catch (err: unknown) {
-      console.error('Google Sign In error:', err);
+    } catch {
       addToast('Aviso', 'Não foi possível conectar com o Google.', '⚠️');
     }
   };
@@ -151,17 +143,53 @@ export default function App() {
     try {
       await signOut(auth);
       addToast('Desconectado', 'Sua sessão foi encerrada.', '👋');
-    } catch (err) {
-      console.error('Sign Out error:', err);
+    } catch {
+      // ignore
     }
   };
 
-  // Compute rankings reactively
   const rankings = useMemo(() => {
     return computeRankings(participants, entries, timeframe);
   }, [participants, entries, timeframe]);
 
-  // Entry Actions (Synced directly to Firestore)
+  // 1-Tap Quick Point directly from Ranking Card!
+  const handleQuickAddPoint = async (participantId: string) => {
+    triggerHaptic([20, 30, 40]);
+    if (!soundMuted) {
+      playSuccessSound(false);
+    }
+    try {
+      confetti({
+        particleCount: 25,
+        spread: 50,
+        origin: { y: 0.7 },
+      });
+    } catch {
+      // ignore
+    }
+
+    const person = participants.find((p) => p.id === participantId);
+    const personName = person ? person.name : 'Participante';
+
+    const newId = `entry-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newEntry: PoopEntry = {
+      id: newId,
+      participantId,
+      timestamp: new Date().toISOString(),
+      effortLevel: 3,
+      location: 'casa',
+      createdBy: currentUser?.uid || undefined,
+    };
+
+    try {
+      await saveEntryToFirestore(newEntry);
+      addToast('+1 Ponto no Placar!', `${personName} pontuou no Trono!`, person?.avatar || '🚽');
+    } catch (err) {
+      console.error('Error saving quick point:', err);
+      addToast('Erro ao salvar', 'Não foi possível gravar na nuvem.', '❌');
+    }
+  };
+
   const handleSaveEntry = async (entryData: Omit<PoopEntry, 'id'>, existingId?: string) => {
     const person = participants.find((p) => p.id === entryData.participantId);
     const personName = person ? person.name : 'Participante';
@@ -174,7 +202,7 @@ export default function App() {
           createdBy: currentUser?.uid || undefined,
         };
         await saveEntryToFirestore(updatedEntry);
-        addToast('Entrada Atualizada!', `Registro de ${personName} salvo na nuvem.`, '✏️');
+        addToast('Registro Atualizado!', `Dados de ${personName} foram alterados.`, '✏️');
       } else {
         const newId = `entry-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         const newEntry: PoopEntry = {
@@ -183,7 +211,7 @@ export default function App() {
           createdBy: currentUser?.uid || undefined,
         };
         await saveEntryToFirestore(newEntry);
-        addToast('Novo Ponto no Ranking!', `${personName} pontuou no Torneio do Trono!`, '🚽');
+        addToast('Ida Registrada!', `${personName} pontuou no Torneio!`, person?.avatar || '🚽');
       }
     } catch (err) {
       console.error('Error saving entry:', err);
@@ -196,10 +224,9 @@ export default function App() {
     triggerHaptic(20);
     try {
       await deleteEntryFromFirestore(id);
-      addToast('Registro Excluído', 'A ida ao banheiro foi removida do placar.', '🗑️');
+      addToast('Registro Excluído', 'A ida foi removida do placar.', '🗑️');
     } catch (err) {
       console.error('Error deleting entry:', err);
-      addToast('Erro ao excluir', 'Não foi possível remover da nuvem.', '❌');
     }
   };
 
@@ -208,19 +235,13 @@ export default function App() {
     setIsQuickLogOpen(true);
   };
 
-  const handleQuickLogForUser = (pId: string) => {
-    setQuickLogParticipantId(pId);
+  const handleOpenDetailedLog = (participantId?: string) => {
+    setQuickLogParticipantId(participantId || participants[0]?.id);
     setEditingEntry(null);
     setIsQuickLogOpen(true);
   };
 
-  const handleOpenNewEntryModal = () => {
-    setQuickLogParticipantId(participants[0]?.id);
-    setEditingEntry(null);
-    setIsQuickLogOpen(true);
-  };
-
-  // Participant Actions (Synced to Firestore)
+  // Participant Actions
   const handleAddParticipant = async (pData: Omit<Participant, 'id' | 'createdAt'>) => {
     const newParticipant: Participant = {
       ...pData,
@@ -229,57 +250,48 @@ export default function App() {
     };
     try {
       await saveParticipantToFirestore(newParticipant);
-      addToast('Amigo Adicionado!', `${newParticipant.name} entrou na disputa do trono!`, newParticipant.avatar);
+      addToast('Amigo Adicionado!', `${newParticipant.name} entrou na disputa!`, newParticipant.avatar);
     } catch (err) {
       console.error('Error adding participant:', err);
-      addToast('Erro', 'Não foi possível salvar o amigo no banco.', '❌');
     }
   };
 
   const handleUpdateParticipant = async (updated: Participant) => {
     try {
       await saveParticipantToFirestore(updated);
-      addToast('Perfil Atualizado!', `Dados de ${updated.name} foram salvos.`, updated.avatar);
+      addToast('Amigo Atualizado!', `Dados de ${updated.name} foram salvos.`, updated.avatar);
     } catch (err) {
       console.error('Error updating participant:', err);
-      addToast('Erro', 'Não foi possível atualizar o participante.', '❌');
     }
   };
 
   const handleDeleteParticipant = async (id: string) => {
     try {
       await deleteParticipantFromFirestore(id);
-      addToast('Competidor Removido', 'Participante excluído da liga.', '👋');
+      addToast('Amigo Removido', 'Participante excluído da liga.', '👋');
     } catch (err) {
       console.error('Error deleting participant:', err);
-      addToast('Erro', 'Não foi possível excluir o participante.', '❌');
     }
   };
 
   const handleResetData = async () => {
-    if (window.confirm('Deseja recarregar os dados de exemplo da Liga do Trono na nuvem Firebase?')) {
+    if (window.confirm('Deseja recarregar os dados de exemplo da Liga do Trono na nuvem?')) {
       try {
         await resetFirestoreToSample();
-        addToast('Dados Recarregados', 'Campeonato restaurado com dados de exemplo.', '✨');
+        addToast('Dados Restaurados', 'Campeonato restaurado com dados de exemplo.', '✨');
       } catch (err) {
         console.error('Error resetting data:', err);
-        addToast('Erro', 'Falha ao restaurar dados de exemplo.', '❌');
       }
     }
   };
 
   const handleClearAllData = async () => {
-    if (
-      window.confirm(
-        'ATENÇÃO: Deseja zerar todos os registros de idas ao banheiro na nuvem? Essa ação não pode ser desfeita.'
-      )
-    ) {
+    if (window.confirm('ATENÇÃO: Deseja zerar todas as idas ao banheiro na nuvem?')) {
       try {
         await clearAllEntriesFromFirestore();
-        addToast('Placar Zerado', 'Todos os registros foram limpos para novo campeonato.', '🧹');
+        addToast('Placar Zerado', 'Todas as idas foram zeradas.', '🧹');
       } catch (err) {
         console.error('Error clearing entries:', err);
-        addToast('Erro', 'Falha ao zerar registros.', '❌');
       }
     }
   };
@@ -289,10 +301,10 @@ export default function App() {
       {/* Toast Notifications */}
       <ToastNotification toasts={toasts} onDismiss={handleDismissToast} />
 
-      {/* Navigation Header */}
+      {/* Header */}
       <Header
         participants={participants}
-        onOpenNewEntry={handleOpenNewEntryModal}
+        onOpenNewEntry={() => handleOpenDetailedLog()}
         onOpenParticipants={() => setIsParticipantsModalOpen(true)}
         onOpenShare={() => setIsShareModalOpen(true)}
         soundMuted={soundMuted}
@@ -305,140 +317,108 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6 pb-28 md:pb-12">
-        {/* Navigation Tabs (Desktop & Tablet) */}
-        <div className="flex items-center justify-between border-b-2 border-stone-900/10 pb-4 gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-stone-200/80 p-1.5 rounded-2xl border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5 pb-24">
+        {/* Simple Tab Switcher */}
+        <div className="flex items-center justify-between gap-2 border-b-2 border-stone-900/10 pb-3">
+          <div className="flex items-center gap-2 bg-stone-200/90 p-1 rounded-2xl border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
             <button
-              id="tab-ranking"
               onClick={() => {
                 triggerHaptic(10);
                 setActiveTab('ranking');
               }}
-              className={`px-3.5 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'ranking'
                   ? 'bg-[#FFD93D] text-stone-950 border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                  : 'text-stone-700 hover:text-stone-950 hover:bg-stone-300/60 border-2 border-transparent'
+                  : 'text-stone-700 hover:text-stone-950'
               }`}
             >
               <Trophy className="w-4 h-4 text-stone-900" />
-              <span>Campeonato</span>
+              <span>Placar & 1-Toque</span>
             </button>
 
             <button
-              id="tab-feed"
               onClick={() => {
                 triggerHaptic(10);
-                setActiveTab('feed');
+                setActiveTab('history');
               }}
-              className={`px-3.5 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'feed'
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'history'
                   ? 'bg-[#4D96FF] text-white border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                  : 'text-stone-700 hover:text-stone-950 hover:bg-stone-300/60 border-2 border-transparent'
+                  : 'text-stone-700 hover:text-stone-950'
               }`}
             >
               <History className="w-4 h-4 text-current" />
               <span>Histórico ({entries.length})</span>
             </button>
-
-            <button
-              id="tab-stats"
-              onClick={() => {
-                triggerHaptic(10);
-                setActiveTab('stats');
-              }}
-              className={`px-3.5 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'stats'
-                  ? 'bg-[#6BCB77] text-stone-950 border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                  : 'text-stone-700 hover:text-stone-950 hover:bg-stone-300/60 border-2 border-transparent'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4 text-stone-900" />
-              <span>Estatísticas</span>
-            </button>
           </div>
 
-          {/* Quick Friend 1-Tap Log Badges */}
-          <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-stone-700 font-bold flex-wrap">
-            <span className="hidden sm:inline">1-Clique:</span>
-            {participants.slice(0, 4).map((p) => (
-              <button
-                key={p.id}
-                onClick={() => handleQuickLogForUser(p.id)}
-                title={`Registrar ida para ${p.name}`}
-                className="px-2.5 py-1.5 rounded-xl bg-white border-2 border-stone-900 hover:bg-[#FFD93D] text-stone-900 font-black transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none min-h-[36px]"
-              >
-                <span>{p.avatar}</span>
-                <span>{p.name}</span>
-                <span className="text-[#FF6B6B] font-black">+1</span>
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => handleOpenDetailedLog()}
+            className="hidden sm:flex px-3.5 py-2 rounded-xl text-xs font-black bg-[#FF6B6B] hover:bg-[#ff5252] text-white border-2 border-stone-900 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+            <span>+ Registro Detalhado</span>
+          </button>
         </div>
 
-        {/* Tab Content */}
+        {/* Tab 1: Leaderboard with Instant 1-Tap */}
         {activeTab === 'ranking' && (
           <LeaderboardView
             rankings={rankings}
             timeframe={timeframe}
             onChangeTimeframe={setTimeframe}
-            onQuickLogForUser={handleQuickLogForUser}
+            onQuickAddPoint={handleQuickAddPoint}
+            onOpenDetailedLog={handleOpenDetailedLog}
           />
         )}
 
-        {activeTab === 'feed' && (
+        {/* Tab 2: History */}
+        {activeTab === 'history' && (
           <HistoryTimeline
             entries={entries}
             participants={participants}
             onEditEntry={handleEditEntry}
             onDeleteEntry={handleDeleteEntry}
-            onOpenNewEntry={handleOpenNewEntryModal}
+            onOpenNewEntry={() => handleOpenDetailedLog()}
           />
         )}
 
-        {activeTab === 'stats' && (
-          <StatsDashboard
-            entries={entries}
-            participants={participants}
-            timeframe={timeframe}
-          />
-        )}
-
-        {/* Bottom Utility Bar (Reset & Clear) */}
-        <div className="pt-6 pb-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-700 font-bold border-t-2 border-stone-900/10">
+        {/* Quick Footer Utilities */}
+        <div className="pt-6 border-t-2 border-stone-900/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-600 font-bold">
           <div className="flex items-center gap-2">
-            <span>🚽 <strong>Torneio do Trono</strong> • Conectado ao Firebase Firestore</span>
+            <span>🚽 <strong>Torneio do Trono</strong> • Liga dos Amigos</span>
           </div>
+
           <div className="flex items-center gap-3">
             <button
               onClick={handleResetData}
-              className="hover:text-stone-950 hover:underline transition-colors flex items-center gap-1 cursor-pointer font-extrabold"
+              className="hover:text-stone-950 hover:underline transition-colors flex items-center gap-1 cursor-pointer"
             >
-              <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Recarregar Exemplo na Nuvem</span>
+              <RefreshCw className="w-3 h-3" />
+              <span>Restaurar Exemplo</span>
             </button>
             <span>•</span>
             <button
               onClick={handleClearAllData}
-              className="hover:text-rose-600 hover:underline transition-colors flex items-center gap-1 cursor-pointer font-extrabold"
+              className="hover:text-rose-600 hover:underline transition-colors flex items-center gap-1 cursor-pointer"
             >
-              <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Zerar Placar na Nuvem</span>
+              <Trash2 className="w-3 h-3" />
+              <span>Zerar Placar</span>
             </button>
           </div>
         </div>
       </main>
 
-      {/* Mobile Bottom Dock Navigation */}
-      <MobileBottomNav
-        activeTab={activeTab}
-        onChangeTab={setActiveTab}
-        onOpenNewEntry={handleOpenNewEntryModal}
-        onOpenParticipants={() => setIsParticipantsModalOpen(true)}
-        onOpenShare={() => setIsShareModalOpen(true)}
-        soundMuted={soundMuted}
-        entriesCount={entries.length}
-      />
+      {/* Floating Action Button on Mobile */}
+      <div className="fixed bottom-4 right-4 sm:hidden z-40">
+        <button
+          onClick={() => handleOpenDetailedLog()}
+          className="px-4 py-3 rounded-2xl font-black text-xs bg-[#FF6B6B] text-white border-2 border-stone-900 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" />
+          <span>+ Registrar Ida</span>
+        </button>
+      </div>
 
       {/* Modals */}
       <QuickLogModal
