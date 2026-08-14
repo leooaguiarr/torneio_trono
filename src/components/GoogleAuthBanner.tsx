@@ -1,7 +1,8 @@
 import React from 'react';
-import { User, LogIn, LogOut, Sparkles } from 'lucide-react';
+import { User, LogIn, LogOut, Sparkles, Trophy } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Participant } from '../types';
+import { getDeterministicFunnyNickname } from '../utils/funnyTitles';
 
 interface GoogleAuthBannerProps {
   currentUser: FirebaseUser | null;
@@ -19,59 +20,63 @@ export const GoogleAuthBanner: React.FC<GoogleAuthBannerProps> = ({
   isSigningIn,
 }) => {
   if (currentUser) {
+    const nickname = currentParticipant?.nickname || getDeterministicFunnyNickname(currentUser.uid);
+    const userName = currentParticipant?.name || currentUser.displayName?.split(' ')[0] || 'Guerreiro(a)';
+
     return (
-      <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-2xs">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className="bg-gradient-to-r from-amber-100/90 via-amber-50 to-amber-100/70 border-2 border-amber-400/80 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-3 min-w-0">
           {currentUser.photoURL ? (
             <img
               src={currentUser.photoURL}
-              alt={currentUser.displayName || 'Usuário'}
-              className="w-9 h-9 rounded-full border border-amber-300 object-cover shrink-0"
+              alt={userName}
+              className="w-10 h-10 rounded-2xl border-2 border-amber-500 object-cover shrink-0 shadow-2xs"
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="w-9 h-9 rounded-full bg-amber-400 border border-stone-900/10 flex items-center justify-center font-bold text-sm shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-amber-400 border-2 border-amber-500 flex items-center justify-center font-bold text-xl shrink-0 shadow-2xs">
               {currentParticipant?.avatar || '👑'}
             </div>
           )}
 
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">
-                Conectado como
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="text-[10px] font-black bg-amber-400 text-amber-950 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                {nickname}
               </span>
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
-            <p className="text-xs sm:text-sm font-black text-stone-900 truncate">
-              {currentParticipant?.avatar} {currentParticipant?.name || currentUser.displayName || 'Você'}
+            <p className="text-sm sm:text-base font-black text-stone-950 truncate flex items-center gap-1">
+              <span>{currentParticipant?.avatar || '👑'}</span>
+              <span>{userName}</span>
             </p>
           </div>
         </div>
 
         <button
           onClick={onSignOut}
-          className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-white/80 hover:bg-white text-stone-600 hover:text-stone-900 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
+          className="px-2.5 sm:px-3 py-2 rounded-xl border border-amber-300 bg-white/90 hover:bg-rose-50 hover:border-rose-300 text-stone-700 hover:text-rose-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs group"
           title="Sair da conta Google"
         >
-          <LogOut className="w-3.5 h-3.5 text-stone-500" />
-          <span className="hidden sm:inline">Trocar conta</span>
+          <LogOut className="w-3.5 h-3.5 text-stone-500 group-hover:text-rose-600" />
+          <span className="hidden sm:inline">Sair</span>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-r from-stone-900 to-stone-800 text-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-stone-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+    <div className="bg-gradient-to-r from-stone-900 to-stone-800 text-white rounded-2xl p-3.5 sm:p-4 shadow-sm border-2 border-stone-900 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl shrink-0 border border-white/10">
-          👑
+        <div className="w-10 h-10 rounded-2xl bg-amber-400 text-stone-950 flex items-center justify-center text-xl shrink-0 font-bold border border-amber-300">
+          🚽
         </div>
         <div>
-          <h3 className="font-bold text-xs sm:text-sm text-white flex items-center gap-1.5">
-            <span>Entre com o Google para pontuar</span>
+          <h3 className="font-black text-xs sm:text-sm text-white flex items-center gap-1.5">
+            <span>Entre com o Google para pontuar!</span>
           </h3>
           <p className="text-[11px] text-stone-300 font-medium">
-            Seu perfil entra automaticamente no ranking dos amigos!
+            Ganhe seu apelido oficial e dispute o Trono com seus amigos!
           </p>
         </div>
       </div>
@@ -100,7 +105,7 @@ export const GoogleAuthBanner: React.FC<GoogleAuthBannerProps> = ({
             d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
           />
         </svg>
-        <span>{isSigningIn ? 'Entrando...' : 'Entrar com Google'}</span>
+        <span>Entrar com Google</span>
       </button>
     </div>
   );

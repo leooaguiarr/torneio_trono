@@ -1,5 +1,6 @@
 import { EffortLevel, LocationType, Participant, ParticipantRankingStats, PoopEntry, Timeframe } from '../types';
 import { isWithinTimeframe } from './dateUtils';
+import { getLocationRoast, getDeterministicFunnyNickname } from './funnyTitles';
 
 export function computeRankings(
   participants: Participant[],
@@ -153,29 +154,28 @@ export function generateWhatsAppSummary(
   timeframeLabel: { title: string; subtitle: string }
 ): string {
   if (stats.length === 0) {
-    return 'Nenhum registro ainda no Torneio do Trono!';
+    return 'Nenhum registro ainda no Torneio do Trono! 🚽';
   }
 
   const medals = ['🥇', '🥈', '🥉'];
-  let message = `🚽👑 *TORNEIO DO TRONO - RANKING OFICIAL* 👑🚽\n`;
+  let message = `🚽👑 *TORNEIO DO TRONO - PLACAR DOS CAGÕES* 👑🚽\n`;
   message += `📅 *${timeframeLabel.title}* (${timeframeLabel.subtitle})\n\n`;
   message += `*CLASSIFICAÇÃO GERAL:*\n`;
 
   stats.forEach((s, idx) => {
     const medal = idx < 3 ? medals[idx] : `*${idx + 1}º*`;
-    const titleStr = s.titles.length > 0 ? ` [${s.titles[0]}]` : '';
-    message += `${medal} *${s.participant.name}*: ${s.totalCount} idas`;
-    if (s.avgEffort > 0) {
-      message += ` (Esforço médio: ${s.avgEffort}/5)`;
-    }
-    message += `${titleStr}\n`;
+    const nickname = s.participant.nickname || getDeterministicFunnyNickname(s.participant.id);
+    const roastInfo = getLocationRoast(s.locationBreakdown, s.totalCount);
+
+    message += `${medal} *"${nickname}"* - ${s.participant.name}: ${s.totalCount} idas\n`;
+    message += `   ↳ ${roastInfo.emoji} ${roastInfo.roast}\n`;
   });
 
   const leader = stats[0];
   if (leader && leader.totalCount > 0) {
-    message += `\n🔥 *Líder Atual:* ${leader.participant.name} com ${leader.totalCount} idas ao trono!\n`;
+    message += `\n👑 *Dono do Trono Atual:* ${leader.participant.name} com ${leader.totalCount} idas!\n`;
   }
 
-  message += `\n_Gerado pelo Torneio do Trono App 💩_`;
+  message += `\n_Acesse o app e registre sua ida agora! 💩🚀_`;
   return message;
 }

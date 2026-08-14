@@ -3,7 +3,7 @@ import { X, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { EFFORT_LEVELS, EffortLevel, LOCATIONS, LocationType, Participant, PoopEntry } from '../types';
 import { formatToDateTimeLocal } from '../utils/dateUtils';
-import { playSuccessSound, triggerHaptic } from '../utils/soundEffects';
+import { playFartSound, triggerHaptic } from '../utils/soundEffects';
 
 interface QuickLogModalProps {
   isOpen: boolean;
@@ -74,7 +74,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
     );
 
     if (!soundMuted) {
-      playSuccessSound(false);
+      playFartSound(false, effortLevel);
     }
 
     try {

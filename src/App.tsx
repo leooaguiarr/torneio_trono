@@ -5,11 +5,14 @@ import { Header } from './components/Header';
 import { LeaderboardView } from './components/LeaderboardView';
 import { HistoryTimeline } from './components/HistoryTimeline';
 import { QuickLogModal } from './components/QuickLogModal';
+import { QuickLocationModal } from './components/QuickLocationModal';
+import { WelcomeCagaoModal } from './components/WelcomeCagaoModal';
 import { ShareRankingModal } from './components/ShareRankingModal';
 import { ToastNotification, ToastMessage } from './components/ToastNotification';
 import { GoogleAuthBanner } from './components/GoogleAuthBanner';
-import { Participant, PoopEntry, Timeframe } from './types';
+import { Participant, PoopEntry, Timeframe, LocationType, EffortLevel } from './types';
 import { computeRankings } from './utils/rankingCalculations';
+import { getRandomFunnyNickname, getDeterministicFunnyNickname } from './utils/funnyTitles';
 import { triggerHaptic, playSuccessSound } from './utils/soundEffects';
 import confetti from 'canvas-confetti';
 import { auth, googleProvider, testConnection } from './lib/firebase';
@@ -23,6 +26,7 @@ import {
 } from './services/firestoreService';
 
 const STORAGE_KEY_SOUND = 'torneio_trono_sound_muted';
+const STORAGE_KEY_SEEN_WELCOME = 'torneio_trono_seen_welcome_';
 
 const AVATAR_OPTIONS = ['👑', '⚡', '🦁', '🦖', '🤠', '🥷', '🚀', '🔥', '🧘', '🍕', '💩', '🥑', '🌮', '☕', '👾', '🎯'];
 
@@ -46,6 +50,15 @@ export default function App() {
   const [editingEntry, setEditingEntry] = useState<PoopEntry | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
+  // Quick Location Modal for "+1 Ida"
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState<boolean>(false);
+  const [locationTargetParticipant, setLocationTargetParticipant] = useState<Participant | null>(null);
+
+  // "Bem-vindo Cagão!" Popup Modal
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(false);
+  const [welcomeParticipant, setWelcomeParticipant] = useState<Participant | null>(null);
+  const [welcomeNickname, setWelcomeNickname] = useState<string>('');
+
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -54,7 +67,7 @@ export default function App() {
     setToasts((prev) => [...prev, { id, title, message, emoji }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 2800);
+    }, 3200);
   };
 
   const handleDismissToast = (id: string) => {
@@ -95,11 +108,12 @@ export default function App() {
           );
 
           if (!existingParticipant) {
-            // Pick a random avatar
             const randomAvatar = AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)];
+            const assignedNickname = getRandomFunnyNickname();
             const newParticipant: Participant = {
               id: `p-${user.uid.substring(0, 10)}`,
               name: user.displayName || user.email?.split('@')[0] || 'Guerreiro(a)',
+              nickname: assignedNickname,
               avatar: randomAvatar,
               color: 'amber',
               createdAt: new Date().toISOString(),
@@ -108,15 +122,34 @@ export default function App() {
               photoURL: user.photoURL || undefined,
             };
             await saveParticipantToFirestore(newParticipant);
-            addToast('Bem-vindo(a) ao Torneio!', `${newParticipant.name} entrou no ranking!`, randomAvatar);
-          } else if (!existingParticipant.userId) {
-            // Link existing participant with userId
-            await saveParticipantToFirestore({
-              ...existingParticipant,
-              userId: user.uid,
-              email: user.email || existingParticipant.email,
-              photoURL: user.photoURL || existingParticipant.photoURL,
-            });
+
+            // Trigger "Bem-vindo Cagão!" popup
+            setWelcomeParticipant(newParticipant);
+            setWelcomeNickname(assignedNickname);
+            setIsWelcomeModalOpen(true);
+          } else {
+            const nickname = existingParticipant.nickname || getDeterministicFunnyNickname(user.uid);
+            if (!existingParticipant.nickname || !existingParticipant.userId) {
+              await saveParticipantToFirestore({
+                ...existingParticipant,
+                nickname,
+                userId: user.uid,
+                email: user.email || existingParticipant.email,
+                photoURL: user.photoURL || existingParticipant.photoURL,
+              });
+            }
+
+            // Check if user should see welcome popup this session
+            const seenKey = STORAGE_KEY_SEEN_WELCOME + user.uid;
+            if (!sessionStorage.getItem(seenKey)) {
+              sessionStorage.setItem(seenKey, 'true');
+              setWelcomeParticipant({
+                ...existingParticipant,
+                nickname,
+              });
+              setWelcomeNickname(nickname);
+              setIsWelcomeModalOpen(true);
+            }
           }
         } catch (err) {
           console.error('Error auto-syncing Google participant:', err);
@@ -160,11 +193,13 @@ export default function App() {
   // Compute matched current participant
   const currentParticipant = useMemo(() => {
     if (!currentUser) return null;
-    return participants.find(
-      (p) =>
-        p.userId === currentUser.uid ||
-        (p.email && currentUser.email && p.email.toLowerCase() === currentUser.email.toLowerCase())
-    ) || null;
+    return (
+      participants.find(
+        (p) =>
+          p.userId === currentUser.uid ||
+          (p.email && currentUser.email && p.email.toLowerCase() === currentUser.email.toLowerCase())
+      ) || null
+    );
   }, [currentUser, participants]);
 
   const rankings = useMemo(() => {
@@ -178,17 +213,20 @@ export default function App() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      
+
       // Check if already in participants
-      const exists = participants.some(
+      const existing = participants.find(
         (p) => p.userId === user.uid || (p.email && user.email && p.email.toLowerCase() === user.email.toLowerCase())
       );
 
-      if (!exists) {
+      const assignedNickname = existing?.nickname || getRandomFunnyNickname();
+
+      if (!existing) {
         const randomAvatar = AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)];
         const newParticipant: Participant = {
           id: `p-${user.uid.substring(0, 10)}`,
           name: user.displayName || user.email?.split('@')[0] || 'Guerreiro(a)',
+          nickname: assignedNickname,
           avatar: randomAvatar,
           color: 'amber',
           createdAt: new Date().toISOString(),
@@ -197,9 +235,13 @@ export default function App() {
           photoURL: user.photoURL || undefined,
         };
         await saveParticipantToFirestore(newParticipant);
+        setWelcomeParticipant(newParticipant);
+      } else {
+        setWelcomeParticipant(existing);
       }
 
-      addToast('Conectado com sucesso!', `Olá, ${user.displayName || 'Guerreiro'}!`, '🎉');
+      setWelcomeNickname(assignedNickname);
+      setIsWelcomeModalOpen(true);
     } catch (err: any) {
       console.error('Error signing in with Google:', err);
       if (err.code !== 'auth/popup-closed-by-user') {
@@ -220,43 +262,67 @@ export default function App() {
     }
   };
 
-  // 1-Tap Quick Point directly from Ranking Card!
-  const handleQuickAddPoint = async (participantId: string) => {
+  // Trigger Location Question Modal on "+1 Ida" click
+  const handleOpenLocationQuestion = (participantId?: string) => {
     if (!currentUser) {
       handleSignInWithGoogle();
       return;
     }
 
-    triggerHaptic([20, 30, 40]);
-    if (!soundMuted) {
-      playSuccessSound(false);
-    }
-    try {
-      confetti({
-        particleCount: 25,
-        spread: 50,
-        origin: { y: 0.7 },
-      });
-    } catch {
-      // ignore
+    const targetId = participantId || currentParticipant?.id || participants[0]?.id;
+    const targetPerson = participants.find((p) => p.id === targetId) || currentParticipant;
+
+    if (!targetPerson) {
+      handleSignInWithGoogle();
+      return;
     }
 
-    const person = participants.find((p) => p.id === participantId);
-    const personName = person ? person.name : 'Participante';
+    triggerHaptic(15);
+    setLocationTargetParticipant(targetPerson);
+    setIsLocationModalOpen(true);
+  };
 
+  // Confirm +1 Ida from QuickLocationModal
+  const handleConfirmLocationPoint = async (location: LocationType, effortLevel: EffortLevel) => {
+    if (!currentUser || !locationTargetParticipant) return;
+
+    const person = locationTargetParticipant;
     const newId = `entry-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newEntry: PoopEntry = {
       id: newId,
-      participantId,
+      participantId: person.id,
       timestamp: new Date().toISOString(),
-      effortLevel: 3,
-      location: 'casa',
-      createdBy: currentUser?.uid,
+      effortLevel,
+      location,
+      createdBy: currentUser.uid,
     };
 
     try {
       await saveEntryToFirestore(newEntry);
-      addToast('+1 Ida Registrada!', `${personName} pontuou no Torneio!`, person?.avatar || '🚽');
+
+      // Funny toast feedback based on location
+      switch (location) {
+        case 'trabalho':
+          addToast('+1 no Trabalho! 💼', 'Cagada Remunerada computada com louvor! 💸', '🤑');
+          break;
+        case 'casa':
+          addToast('+1 em Casa! 🏠', 'No trono sagrado e climatizado!', '👑');
+          break;
+        case 'role':
+          addToast('+1 no Rolê! 🍻', 'Guerreiro de banheiro de boteco!', '🛡️');
+          break;
+        case 'publico':
+          addToast('+1 no Shopping / Público! 🏢', 'Sem frescura com a porcelana alheia!', '🛒');
+          break;
+        case 'academia':
+          addToast('+1 na Academia! 💪', 'O pré-treino foi direto pro ralo!', '⚡');
+          break;
+        case 'viagem':
+          addToast('+1 em Viagem! ✈️', 'Território internacional devidamente colonizado!', '🗺️');
+          break;
+        default:
+          addToast('+1 Ida Registrada! 🚽', `${person.name} pontuou no Torneio!`, person.avatar || '💩');
+      }
     } catch (err) {
       console.error('Error saving quick point:', err);
       addToast('Erro ao salvar', 'Não foi possível gravar na nuvem.', '❌');
@@ -408,8 +474,8 @@ export default function App() {
             rankings={rankings}
             timeframe={timeframe}
             onChangeTimeframe={setTimeframe}
-            onQuickAddPoint={handleQuickAddPoint}
-            onOpenNewEntry={() => handleOpenDetailedLog(currentParticipant?.id)}
+            onQuickAddPoint={handleOpenLocationQuestion}
+            onOpenNewEntry={() => handleOpenLocationQuestion(currentParticipant?.id)}
             onOpenDetailedLog={handleOpenDetailedLog}
             currentUser={currentUser}
             currentParticipant={currentParticipant}
@@ -424,12 +490,29 @@ export default function App() {
             participants={participants}
             onEditEntry={handleEditEntry}
             onDeleteEntry={handleDeleteEntry}
-            onOpenNewEntry={() => handleOpenDetailedLog(currentParticipant?.id)}
+            onOpenNewEntry={() => handleOpenLocationQuestion(currentParticipant?.id)}
           />
         )}
       </main>
 
-      {/* Modals */}
+      {/* Quick Location Selection Modal (Always pops up on "+1 Ida") */}
+      <QuickLocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        participant={locationTargetParticipant}
+        onConfirm={handleConfirmLocationPoint}
+        soundMuted={soundMuted}
+      />
+
+      {/* "Bem-vindo Cagão!" Popup Modal */}
+      <WelcomeCagaoModal
+        isOpen={isWelcomeModalOpen}
+        onClose={() => setIsWelcomeModalOpen(false)}
+        participant={welcomeParticipant}
+        nickname={welcomeNickname}
+      />
+
+      {/* Detailed Log Modal (For manual date/time edits & custom notes) */}
       <QuickLogModal
         isOpen={isQuickLogOpen}
         onClose={() => {
@@ -443,6 +526,7 @@ export default function App() {
         soundMuted={soundMuted}
       />
 
+      {/* WhatsApp Share Ranking Modal */}
       <ShareRankingModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Share2, Volume2, VolumeX, Trash2, LogIn, LogOut } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Participant } from '../types';
+import { getDeterministicFunnyNickname } from '../utils/funnyTitles';
 
 interface HeaderProps {
   onOpenShare: () => void;
@@ -26,6 +27,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSignInWithGoogle,
   onSignOut,
 }) => {
+  const nickname = currentParticipant?.nickname || (currentUser ? getDeterministicFunnyNickname(currentUser.uid) : '');
+
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-xs">
       <div className="max-w-2xl mx-auto px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2.5 sm:gap-3">
@@ -66,9 +69,14 @@ export const Header: React.FC<HeaderProps> = ({
               ) : (
                 <span className="text-xs">{currentParticipant?.avatar || '👤'}</span>
               )}
-              <span className="text-xs font-bold max-w-[80px] sm:max-w-[110px] truncate">
-                {currentParticipant?.name || currentUser.displayName?.split(' ')[0] || 'Eu'}
-              </span>
+              <div className="text-left max-w-[100px] sm:max-w-[130px] truncate leading-tight">
+                <span className="text-[9px] text-amber-800 font-black block truncate">
+                  {nickname}
+                </span>
+                <span className="text-xs font-bold text-stone-900 block truncate">
+                  {currentParticipant?.name || currentUser.displayName?.split(' ')[0] || 'Eu'}
+                </span>
+              </div>
               <LogOut className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition-opacity ml-0.5" />
             </button>
           ) : (
