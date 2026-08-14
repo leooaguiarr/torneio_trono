@@ -92,6 +92,8 @@ export interface Participant {
   userId?: string; // Firebase Auth UID
   email?: string;
   photoURL?: string;
+  isCurrentChampion?: boolean; // Holds the reigning "Campeão da Cagada" trophy
+  championMonth?: string; // e.g. "Julho 2026"
 }
 
 export interface PoopEntry {
@@ -104,6 +106,18 @@ export interface PoopEntry {
   notes?: string;
   bristolScale?: number; // 1 to 7
   createdBy?: string;
+}
+
+export interface MonthWinnerRecord {
+  monthKey: string; // e.g. "2026-07"
+  monthName: string; // e.g. "Julho 2026"
+  participantId: string;
+  participantName: string;
+  participantAvatar: string;
+  participantPhotoURL?: string;
+  nickname: string;
+  totalCount: number;
+  timestamp: string;
 }
 
 export type Timeframe = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'all_time';

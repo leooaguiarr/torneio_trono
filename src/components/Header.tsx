@@ -1,5 +1,5 @@
 import React from 'react';
-import { Share2, Volume2, VolumeX, Trash2, LogIn, LogOut } from 'lucide-react';
+import { Share2, Volume2, VolumeX, LogOut } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Participant } from '../types';
 import { getDeterministicFunnyNickname } from '../utils/funnyTitles';
@@ -9,7 +9,6 @@ interface HeaderProps {
   soundMuted: boolean;
   onToggleSound: () => void;
   totalEntriesCount: number;
-  onClearAll: () => void;
   currentUser: FirebaseUser | null;
   currentParticipant: Participant | null;
   onSignInWithGoogle: () => void;
@@ -21,7 +20,6 @@ export const Header: React.FC<HeaderProps> = ({
   soundMuted,
   onToggleSound,
   totalEntriesCount,
-  onClearAll,
   currentUser,
   currentParticipant,
   onSignInWithGoogle,
@@ -56,23 +54,40 @@ export const Header: React.FC<HeaderProps> = ({
           {currentUser ? (
             <button
               onClick={onSignOut}
-              className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 rounded-xl bg-amber-50 hover:bg-rose-50 border border-amber-300 hover:border-rose-300 text-stone-900 hover:text-rose-700 transition-colors cursor-pointer group shadow-2xs max-w-[110px] sm:max-w-[150px]"
-              title="Clique para sair da conta Google"
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 rounded-xl border transition-colors cursor-pointer group shadow-2xs max-w-[125px] sm:max-w-[165px] ${
+                currentParticipant?.isCurrentChampion
+                  ? 'bg-amber-100/80 hover:bg-rose-50 border-amber-400 hover:border-rose-300 text-stone-900'
+                  : 'bg-amber-50 hover:bg-rose-50 border-amber-300 hover:border-rose-300 text-stone-900 hover:text-rose-700'
+              }`}
+              title={currentParticipant?.isCurrentChampion ? '🏆 Campeão da Cagada! (Clique para sair)' : 'Clique para sair da conta Google'}
             >
               {currentUser.photoURL ? (
-                <img
-                  src={currentUser.photoURL}
-                  alt={currentUser.displayName || ''}
-                  className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-amber-400 shrink-0"
-                  referrerPolicy="no-referrer"
-                />
+                <div className="relative shrink-0">
+                  <img
+                    src={currentUser.photoURL}
+                    alt={currentUser.displayName || ''}
+                    className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-amber-400 shrink-0"
+                    referrerPolicy="no-referrer"
+                  />
+                  {currentParticipant?.isCurrentChampion && (
+                    <span className="absolute -top-1 -right-1 text-[9px] leading-none">🏆</span>
+                  )}
+                </div>
               ) : (
-                <span className="text-xs shrink-0">{currentParticipant?.avatar || '👤'}</span>
+                <span className="text-xs shrink-0">
+                  {currentParticipant?.isCurrentChampion ? '🏆' : currentParticipant?.avatar || '👤'}
+                </span>
               )}
               <div className="text-left min-w-0 flex-1 truncate leading-tight">
-                <span className="text-[8px] sm:text-[9px] text-amber-800 font-black block truncate">
-                  {nickname}
-                </span>
+                {currentParticipant?.isCurrentChampion ? (
+                  <span className="text-[8px] sm:text-[9px] text-amber-950 font-black block truncate flex items-center gap-0.5">
+                    <span>👑 Campeão</span>
+                  </span>
+                ) : (
+                  <span className="text-[8px] sm:text-[9px] text-amber-800 font-black block truncate">
+                    {nickname}
+                  </span>
+                )}
                 <span className="text-[11px] sm:text-xs font-bold text-stone-900 block truncate">
                   {currentParticipant?.name || currentUser.displayName?.split(' ')[0] || 'Eu'}
                 </span>
@@ -126,16 +141,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">WhatsApp</span>
-          </button>
-
-          {/* Clear Button */}
-          <button
-            id="btn-clear"
-            onClick={onClearAll}
-            title="Zerar banco de dados"
-            className="p-1.5 sm:p-2 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 border border-stone-200 transition-colors cursor-pointer shrink-0"
-          >
-            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         </div>
       </div>

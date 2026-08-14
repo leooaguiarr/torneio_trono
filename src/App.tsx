@@ -7,26 +7,28 @@ import { HistoryTimeline } from './components/HistoryTimeline';
 import { QuickLogModal } from './components/QuickLogModal';
 import { QuickLocationModal } from './components/QuickLocationModal';
 import { WelcomeCagaoModal } from './components/WelcomeCagaoModal';
+import { MonthlyChampionModal } from './components/MonthlyChampionModal';
 import { ShareRankingModal } from './components/ShareRankingModal';
 import { ToastNotification, ToastMessage } from './components/ToastNotification';
 import { GoogleAuthBanner } from './components/GoogleAuthBanner';
-import { Participant, PoopEntry, Timeframe, LocationType, EffortLevel } from './types';
+import { Participant, PoopEntry, Timeframe, LocationType, EffortLevel, MonthWinnerRecord } from './types';
 import { computeRankings } from './utils/rankingCalculations';
 import { getRandomFunnyNickname, getDeterministicFunnyNickname } from './utils/funnyTitles';
-import { triggerHaptic, playSuccessSound } from './utils/soundEffects';
-import confetti from 'canvas-confetti';
+import { triggerHaptic } from './utils/soundEffects';
 import { auth, googleProvider, testConnection } from './lib/firebase';
 import {
   subscribeToParticipants,
   subscribeToEntries,
+  subscribeToLatestChampion,
   saveParticipantToFirestore,
   saveEntryToFirestore,
   deleteEntryFromFirestore,
-  clearAllFirestoreData,
+  crownMonthlyChampion,
 } from './services/firestoreService';
 
 const STORAGE_KEY_SOUND = 'torneio_trono_sound_muted';
 const STORAGE_KEY_SEEN_WELCOME = 'torneio_trono_seen_welcome_';
+const STORAGE_KEY_SEEN_CHAMPION_POPUP = 'torneio_trono_seen_champion_';
 
 const AVATAR_OPTIONS = ['👑', '⚡', '🦁', '🦖', '🤠', '🥷', '🚀', '🔥', '🧘', '🍕', '💩', '🥑', '🌮', '☕', '👾', '🎯'];
 
@@ -34,6 +36,7 @@ export default function App() {
   // Real Firestore Data
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [entries, setEntries] = useState<PoopEntry[]>([]);
+  const [latestChampionRecord, setLatestChampionRecord] = useState<MonthWinnerRecord | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Auth state
@@ -42,7 +45,7 @@ export default function App() {
 
   // Tab: 'ranking' or 'history'
   const [activeTab, setActiveTab] = useState<'ranking' | 'history'>('ranking');
-  const [timeframe, setTimeframe] = useState<Timeframe>('this_week');
+  const [timeframe, setTimeframe] = useState<Timeframe>('this_month');
 
   // Modals
   const [isQuickLogOpen, setIsQuickLogOpen] = useState(false);
@@ -58,6 +61,9 @@ export default function App() {
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(false);
   const [welcomeParticipant, setWelcomeParticipant] = useState<Participant | null>(null);
   const [welcomeNickname, setWelcomeNickname] = useState<string>('');
+
+  // Monthly Champion Modal
+  const [isChampionModalOpen, setIsChampionModalOpen] = useState<boolean>(false);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -160,7 +166,7 @@ export default function App() {
     return () => unsubscribeAuth();
   }, [participants]);
 
-  // 2. Firebase Listeners (Live Sync for Data)
+  // 2. Firebase Listeners (Live Sync for Data & Champions)
   useEffect(() => {
     testConnection();
 
@@ -184,11 +190,91 @@ export default function App() {
       }
     );
 
+    const unsubChampion = subscribeToLatestChampion(
+      (champion) => {
+        setLatestChampionRecord(champion);
+        if (champion) {
+          // Check if this user has already seen this month's champion popup
+          const seenKey = STORAGE_KEY_SEEN_CHAMPION_POPUP + champion.monthKey;
+          if (!localStorage.getItem(seenKey)) {
+            localStorage.setItem(seenKey, 'true');
+            setIsChampionModalOpen(true);
+          }
+        }
+      },
+      (err) => {
+        console.error('Champion subscription error:', err);
+      }
+    );
+
     return () => {
       unsubParticipants();
       unsubEntries();
+      unsubChampion();
     };
   }, []);
+
+  // 3. Automatic End-of-Month Calculation and Reset Detection
+  useEffect(() => {
+    if (participants.length === 0 || entries.length === 0) return;
+
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // Filter past month entries if any exist from a previous month that needs archiving
+    const entriesFromPastMonths = entries.filter((e) => {
+      const entryDate = new Date(e.timestamp);
+      const entryMonthKey = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}`;
+      return entryMonthKey < currentMonthKey;
+    });
+
+    if (entriesFromPastMonths.length > 0) {
+      // Find the most recent past month that had entries
+      const pastMonths: string[] = Array.from(
+        new Set<string>(
+          entriesFromPastMonths.map((e) => {
+            const d = new Date(e.timestamp);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          })
+        )
+      ).sort();
+
+      const lastPastMonthKey: string = pastMonths[pastMonths.length - 1];
+
+      // If we haven't crowned for this past month yet, compute winner and crown!
+      if (!latestChampionRecord || latestChampionRecord.monthKey < lastPastMonthKey) {
+        const [year, month] = lastPastMonthKey.split('-').map(Number);
+        const monthDate = new Date(year, month - 1, 1);
+        const monthName = monthDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+        const pastMonthEntries = entries.filter((e) => {
+          const d = new Date(e.timestamp);
+          return d.getFullYear() === year && d.getMonth() + 1 === month;
+        });
+
+        const stats = computeRankings(participants, pastMonthEntries, 'all_time');
+        const winnerStat = stats.find((s) => s.totalCount > 0);
+
+        if (winnerStat) {
+          const championRecord: MonthWinnerRecord = {
+            monthKey: lastPastMonthKey,
+            monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+            participantId: winnerStat.participant.id,
+            participantName: winnerStat.participant.name,
+            participantAvatar: winnerStat.participant.avatar,
+            participantPhotoURL: winnerStat.participant.photoURL,
+            nickname: winnerStat.participant.nickname || 'Campeão da Cagada',
+            totalCount: winnerStat.totalCount,
+            timestamp: new Date().toISOString(),
+          };
+
+          crownMonthlyChampion(championRecord, participants).catch((err) => {
+            console.error('Error auto crowning monthly champion:', err);
+          });
+        }
+      }
+    }
+  }, [entries, participants, latestChampionRecord]);
 
   // Compute matched current participant
   const currentParticipant = useMemo(() => {
@@ -201,6 +287,11 @@ export default function App() {
       ) || null
     );
   }, [currentUser, participants]);
+
+  // Reigning champion participant object
+  const championParticipant = useMemo(() => {
+    return participants.find((p) => p.isCurrentChampion) || null;
+  }, [participants]);
 
   const rankings = useMemo(() => {
     return computeRankings(participants, entries, timeframe);
@@ -389,33 +480,17 @@ export default function App() {
     setIsQuickLogOpen(true);
   };
 
-  // Zero database completely
-  const handleClearAll = async () => {
-    triggerHaptic(20);
-    if (window.confirm('Deseja realmente ZERAR todo o banco de dados (remover participantes e todas as idas)?')) {
-      try {
-        await clearAllFirestoreData();
-        setParticipants([]);
-        setEntries([]);
-        addToast('Banco Zerado!', 'Todos os dados foram excluídos.', '🧹');
-      } catch (err) {
-        console.error('Error clearing data:', err);
-      }
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#fafaf9] text-stone-900 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
       {/* Toast Notifications */}
       <ToastNotification toasts={toasts} onDismiss={handleDismissToast} />
 
-      {/* Header */}
+      {/* Header (No clear button, shows reigning status) */}
       <Header
         onOpenShare={() => setIsShareModalOpen(true)}
         soundMuted={soundMuted}
         onToggleSound={handleToggleSound}
         totalEntriesCount={entries.length}
-        onClearAll={handleClearAll}
         currentUser={currentUser}
         currentParticipant={currentParticipant}
         onSignInWithGoogle={handleSignInWithGoogle}
@@ -480,6 +555,8 @@ export default function App() {
             currentUser={currentUser}
             currentParticipant={currentParticipant}
             onSignInWithGoogle={handleSignInWithGoogle}
+            onShowChampionModal={() => setIsChampionModalOpen(true)}
+            championParticipant={championParticipant}
           />
         )}
 
@@ -510,6 +587,15 @@ export default function App() {
         onClose={() => setIsWelcomeModalOpen(false)}
         participant={welcomeParticipant}
         nickname={welcomeNickname}
+      />
+
+      {/* Monthly Champion Celebration Popup Modal */}
+      <MonthlyChampionModal
+        isOpen={isChampionModalOpen}
+        onClose={() => setIsChampionModalOpen(false)}
+        champion={latestChampionRecord}
+        currentUserId={currentUser?.uid}
+        currentUserParticipantId={currentParticipant?.id}
       />
 
       {/* Detailed Log Modal (For manual date/time edits & custom notes) */}

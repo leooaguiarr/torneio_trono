@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trophy, Sparkles, MoreHorizontal, MapPin, Flame } from 'lucide-react';
+import { Plus, Trophy, Sparkles, MoreHorizontal, MapPin, Flame, Award } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Participant, ParticipantRankingStats, Timeframe } from '../types';
 import { getTimeframeLabel } from '../utils/dateUtils';
@@ -16,6 +16,8 @@ interface LeaderboardViewProps {
   currentUser: FirebaseUser | null;
   currentParticipant: Participant | null;
   onSignInWithGoogle: () => void;
+  onShowChampionModal?: () => void;
+  championParticipant?: Participant | null;
 }
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
@@ -28,6 +30,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   currentUser,
   currentParticipant,
   onSignInWithGoogle,
+  onShowChampionModal,
+  championParticipant,
 }) => {
   const timeframeLabel = getTimeframeLabel(timeframe);
   const maxCount = Math.max(...rankings.map((r) => r.totalCount), 1);
@@ -70,6 +74,45 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           </svg>
           <span className="truncate">ENTRAR COM GOOGLE PARA PONTUAR</span>
         </button>
+      )}
+
+      {/* Reigning Champion Banner if exists */}
+      {championParticipant && (
+        <div
+          onClick={onShowChampionModal}
+          className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 border-2 border-stone-900 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-2.5 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:opacity-95 transition-all"
+        >
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-stone-950 text-white flex items-center justify-center text-xl shrink-0 shadow-inner">
+              🏆
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-stone-950 bg-white/70 px-1.5 py-0.2 rounded">
+                  Último Campeão do Mês
+                </span>
+                {championParticipant.championMonth && (
+                  <span className="text-[10px] font-bold text-stone-900 hidden sm:inline">
+                    ({championParticipant.championMonth})
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                <span className="text-xs sm:text-sm font-black text-stone-950 truncate">
+                  {championParticipant.name}
+                </span>
+                <span className="text-[11px] font-black bg-stone-950 text-amber-300 px-1.5 py-0.5 rounded shadow-2xs">
+                  🏆 Campeão da Cagada
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0 text-right">
+            <span className="text-[11px] font-black text-stone-950 bg-white/80 px-2 py-1 rounded-lg border border-stone-900/20 block">
+              Ver Detalhes ✨
+            </span>
+          </div>
+        </div>
       )}
 
       {/* Period Selector Tabs */}
@@ -127,7 +170,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             <span className="text-2xl sm:text-3xl shrink-0 animate-bounce">👑</span>
             <div className="min-w-0">
               <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 block">
-                Atual Dono do Trono
+                Atual Dono do Trono ({timeframeLabel.title})
               </span>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-xs font-black bg-amber-300/80 text-stone-950 px-1.5 py-0.5 rounded truncate max-w-[180px] sm:max-w-xs">
@@ -245,7 +288,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                     </div>
 
                     {/* Avatar Emoji or Photo */}
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-lg sm:text-xl shrink-0 overflow-hidden shadow-2xs">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-lg sm:text-xl shrink-0 overflow-hidden shadow-2xs relative">
                       {rank.participant.photoURL ? (
                         <img
                           src={rank.participant.photoURL}
@@ -256,6 +299,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       ) : (
                         rank.participant.avatar
                       )}
+                      {rank.participant.isCurrentChampion && (
+                        <span className="absolute -bottom-1 -right-1 text-xs bg-amber-400 rounded-full px-0.5 border border-stone-900 shadow-xs">
+                          🏆
+                        </span>
+                      )}
                     </div>
 
                     {/* Name & Nickname */}
@@ -265,6 +313,12 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                         <span className="text-[10px] font-black bg-stone-900 text-amber-400 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 max-w-full truncate">
                           {funnyNickname}
                         </span>
+
+                        {rank.participant.isCurrentChampion && (
+                          <span className="text-[10px] bg-amber-400 text-stone-950 font-black px-1.5 py-0.5 rounded shrink-0 flex items-center gap-0.5 shadow-2xs">
+                            🏆 Campeão da Cagada
+                          </span>
+                        )}
 
                         {isCurrentUserParticipant && (
                           <span className="text-[10px] bg-amber-400 text-stone-950 font-black px-1.5 py-0.5 rounded shrink-0">

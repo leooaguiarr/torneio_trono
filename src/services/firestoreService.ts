@@ -5,14 +5,17 @@ import {
   deleteDoc,
   onSnapshot,
   getDocs,
+  getDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Participant, PoopEntry } from '../types';
+import { Participant, PoopEntry, MonthWinnerRecord } from '../types';
 import { INITIAL_PARTICIPANTS, generateSeedEntries } from '../data/initialData';
 
 const PARTICIPANTS_COLLECTION = 'participants';
 const ENTRIES_COLLECTION = 'entries';
+const METADATA_COLLECTION = 'metadata';
+const MONTHLY_WINNERS_DOC = 'monthly_winners';
 
 /**
  * Subscribe to real-time participants list
@@ -39,6 +42,8 @@ export function subscribeToParticipants(
             userId: data.userId,
             email: data.email,
             photoURL: data.photoURL,
+            isCurrentChampion: data.isCurrentChampion || false,
+            championMonth: data.championMonth || undefined,
           });
         });
         // Sort by createdAt ascending
@@ -108,6 +113,51 @@ export function subscribeToEntries(
 }
 
 /**
+ * Subscribe to monthly winner record
+ */
+export function subscribeToLatestChampion(
+  onData: (champion: MonthWinnerRecord | null) => void,
+  onError?: (err: Error) => void
+) {
+  try {
+    const docRef = doc(db, METADATA_COLLECTION, MONTHLY_WINNERS_DOC);
+    return onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          onData({
+            monthKey: data.monthKey,
+            monthName: data.monthName,
+            participantId: data.participantId,
+            participantName: data.participantName,
+            participantAvatar: data.participantAvatar,
+            participantPhotoURL: data.participantPhotoURL,
+            nickname: data.nickname,
+            totalCount: data.totalCount,
+            timestamp: data.timestamp,
+          });
+        } else {
+          onData(null);
+        }
+      },
+      (error) => {
+        try {
+          handleFirestoreError(error, OperationType.GET, `${METADATA_COLLECTION}/${MONTHLY_WINNERS_DOC}`);
+        } catch (wrappedErr) {
+          if (onError && wrappedErr instanceof Error) {
+            onError(wrappedErr);
+          }
+        }
+      }
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, `${METADATA_COLLECTION}/${MONTHLY_WINNERS_DOC}`);
+    return () => {};
+  }
+}
+
+/**
  * Initialize Firestore data if collections are completely empty
  */
 export async function seedInitialFirestoreData(fallbackParticipants?: Participant[], fallbackEntries?: PoopEntry[]) {
@@ -166,11 +216,13 @@ export async function saveParticipantToFirestore(participant: Participant) {
       avatar: participant.avatar,
       color: participant.color,
       createdAt: participant.createdAt || new Date().toISOString(),
+      isCurrentChampion: !!participant.isCurrentChampion,
     };
     if (participant.nickname) dataToSave.nickname = participant.nickname;
     if (participant.userId) dataToSave.userId = participant.userId;
     if (participant.email) dataToSave.email = participant.email;
     if (participant.photoURL) dataToSave.photoURL = participant.photoURL;
+    if (participant.championMonth) dataToSave.championMonth = participant.championMonth;
     await setDoc(docRef, dataToSave, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -178,7 +230,7 @@ export async function saveParticipantToFirestore(participant: Participant) {
 }
 
 /**
- * Delete a participant and optionally their entries
+ * Delete a participant
  */
 export async function deleteParticipantFromFirestore(participantId: string) {
   const path = `${PARTICIPANTS_COLLECTION}/${participantId}`;
@@ -226,69 +278,42 @@ export async function deleteEntryFromFirestore(entryId: string) {
 }
 
 /**
- * Reset / Re-seed sample data in Firestore
+ * Set the monthly champion and update participants' champion status
  */
-export async function resetFirestoreToSample() {
+export async function crownMonthlyChampion(
+  championRecord: MonthWinnerRecord,
+  allParticipants: Participant[]
+) {
   try {
-    // Delete existing
-    const partSnap = await getDocs(collection(db, PARTICIPANTS_COLLECTION));
-    const entriesSnap = await getDocs(collection(db, ENTRIES_COLLECTION));
-
     const batch = writeBatch(db);
-    partSnap.forEach((d) => batch.delete(d.ref));
+
+    // 1. Save champion record in metadata
+    const metaRef = doc(db, METADATA_COLLECTION, MONTHLY_WINNERS_DOC);
+    batch.set(metaRef, championRecord);
+
+    // 2. Clear previous champions and set new one
+    for (const p of allParticipants) {
+      const isWinner = p.id === championRecord.participantId;
+      const pRef = doc(db, PARTICIPANTS_COLLECTION, p.id);
+      batch.update(pRef, {
+        isCurrentChampion: isWinner,
+        championMonth: isWinner ? championRecord.monthName : null,
+      });
+    }
+
+    // 3. Clear all entries for the new month
+    const entriesSnap = await getDocs(collection(db, ENTRIES_COLLECTION));
     entriesSnap.forEach((d) => batch.delete(d.ref));
 
-    for (const p of INITIAL_PARTICIPANTS) {
-      const docRef = doc(db, PARTICIPANTS_COLLECTION, p.id);
-      const dataToSave: Record<string, unknown> = {
-        id: p.id,
-        name: p.name,
-        avatar: p.avatar,
-        color: p.color,
-        createdAt: p.createdAt,
-      };
-      if (p.nickname) dataToSave.nickname = p.nickname;
-      batch.set(docRef, dataToSave);
-    }
-
-    for (const e of generateSeedEntries()) {
-      const docRef = doc(db, ENTRIES_COLLECTION, e.id);
-      const entryData: Record<string, unknown> = {
-        id: e.id,
-        participantId: e.participantId,
-        timestamp: e.timestamp,
-        effortLevel: Number(e.effortLevel),
-      };
-      if (e.durationMinutes) entryData.durationMinutes = Number(e.durationMinutes);
-      if (e.location) entryData.location = e.location;
-      if (e.notes) entryData.notes = e.notes;
-      batch.set(docRef, entryData);
-    }
-
     await batch.commit();
+    console.log(`Monthly champion ${championRecord.participantName} crowned successfully.`);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, 'reset_data');
+    handleFirestoreError(error, OperationType.WRITE, 'crown_champion');
   }
 }
 
 /**
- * Clear ALL participants and entries in Firestore (zero the database completely)
- */
-export async function clearAllFirestoreData() {
-  try {
-    const partSnap = await getDocs(collection(db, PARTICIPANTS_COLLECTION));
-    const entriesSnap = await getDocs(collection(db, ENTRIES_COLLECTION));
-    const batch = writeBatch(db);
-    partSnap.forEach((d) => batch.delete(d.ref));
-    entriesSnap.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, 'clear_all');
-  }
-}
-
-/**
- * Clear all entries in Firestore
+ * Clear all entries in Firestore (zeroing the active tournament entries for the new month)
  */
 export async function clearAllEntriesFromFirestore() {
   try {
