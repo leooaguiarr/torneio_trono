@@ -1,6 +1,6 @@
 import { EffortLevel, LocationType, Participant, ParticipantRankingStats, PoopEntry, Timeframe } from '../types';
 import { isWithinTimeframe } from './dateUtils';
-import { getLocationRoast, getDeterministicFunnyNickname } from './funnyTitles';
+import { getLocationRoast, getDynamicFunnyNickname } from './funnyTitles';
 
 export function computeRankings(
   participants: Participant[],
@@ -164,7 +164,7 @@ export function generateWhatsAppSummary(
 
   stats.forEach((s, idx) => {
     const medal = idx < 3 ? medals[idx] : `*${idx + 1}º*`;
-    const nickname = s.participant.nickname || getDeterministicFunnyNickname(s.participant.id);
+    const nickname = getDynamicFunnyNickname(s.locationBreakdown, s.totalCount, s.participant.id || s.participant.name);
     const roastInfo = getLocationRoast(s.locationBreakdown, s.totalCount);
 
     message += `${medal} *"${nickname}"* - ${s.participant.name}: ${s.totalCount} idas\n`;
